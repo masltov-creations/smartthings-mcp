@@ -19,6 +19,9 @@ token-store.json
 tokens.json
 refresh-tokens.json
 
+# Local upstream config
+config/upstreams.json
+
 # Cloudflare Tunnel
 .cloudflare/
 cloudflared/

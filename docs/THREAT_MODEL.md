@@ -4,6 +4,7 @@
 - SmartThings OAuth client secret
 - Access and refresh tokens
 - Device and location identifiers
+- Upstream MCP credentials (if configured)
 
 ## Primary Threats
 - OAuth code interception
@@ -11,6 +12,7 @@
 - Token leakage via logs or backups
 - Malicious MCP tool invocation
 - Unauthorized webhook requests
+- Misconfigured or malicious upstream MCP endpoints
 
 ## Mitigations
 - Strict redirect URI matching and `state` verification
@@ -18,9 +20,9 @@
 - No token values in logs
 - Input validation and allowlisted tools
 - Signature verification or request validation for webhooks (when supported)
+- Explicit upstream allowlist via `config/upstreams.json` and optional auth headers
 
 ## Residual Risks
 - Compromise of the host OS
 - Misconfigured tunnel exposing endpoints
 - Overbroad SmartThings scopes
-

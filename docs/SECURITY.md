@@ -7,7 +7,7 @@ This MCP server is a single-tenant, self-hosted integration that authenticates t
 - Enforce OAuth2 best practices (strict redirect URI matching, CSRF state validation).
 - Minimize SmartThings scopes and reduce blast radius.
 - Prevent token leakage in logs and telemetry.
-- Restrict outbound requests to SmartThings endpoints.
+- Restrict outbound requests to SmartThings endpoints unless explicit gateway upstreams are configured.
 - Verify SmartApp webhook signatures (HTTP Signatures).
 
 ## Operational Guidelines

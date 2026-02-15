@@ -8,6 +8,7 @@ import { TokenStore } from "./tokenStore.js";
 import { createSmartAppHandler } from "./smartapp.js";
 import { SmartThingsClient } from "./smartthingsApi.js";
 import { createMcpServer } from "./mcp.js";
+import { createGateway } from "./gateway.js";
 import { buildAuthorizeUrl, handleOAuthCallback } from "./oauth.js";
 
 const app = express();
@@ -92,6 +93,8 @@ function createE2EChecker(
   };
 }
 
+let gatewayStatus: (() => unknown) | undefined;
+
 const e2eChecker = createE2EChecker(
   client,
   config.e2eCheckIntervalSec,
@@ -132,6 +135,7 @@ app.get("/healthz", async (req, res) => {
     typeof req.query.e2e === "string" && ["1", "true", "yes"].includes(req.query.e2e.toLowerCase());
   const e2e = runE2E ? await e2eChecker.runNow() : e2eChecker.getStatus();
   const go = e2e.status === "pass";
+  const gateway = gatewayStatus ? gatewayStatus() : undefined;
   res.status(200).json({
     ok: true,
     service: "smartthings-mcp",
@@ -140,6 +144,7 @@ app.get("/healthz", async (req, res) => {
     uptimeSec: Math.floor(process.uptime()),
     mode: "operational",
     e2e,
+    gateway,
     go,
     quip: go ? "Green across the board." : "Poking the toaster. Stand by."
   });
@@ -170,7 +175,24 @@ app.get(config.oauthRedirectPath, async (req, res) => {
 });
 
 (async () => {
+  if (config.gatewayEnabled && config.gatewayPath === config.mcpPath) {
+    logger.error("MCP_GATEWAY_PATH must differ from MCP_HTTP_PATH");
+    process.exit(1);
+  }
+
   const { transport } = await createMcpServer(client);
+  let gateway: Awaited<ReturnType<typeof createGateway>> | null = null;
+  if (config.gatewayEnabled) {
+    try {
+      gateway = await createGateway();
+    } catch (err) {
+      logger.error({ err }, "Gateway failed to start; continuing without gateway");
+      gateway = null;
+    }
+  }
+  if (gateway) {
+    gatewayStatus = gateway.status;
+  }
 
   app.all(config.mcpPath, async (req, res) => {
     if (!isHostAllowed(req.headers.host)) {
@@ -186,6 +208,23 @@ app.get(config.oauthRedirectPath, async (req, res) => {
       res.status(500).json({ error: "MCP error" });
     }
   });
+
+  if (gateway) {
+    app.all(config.gatewayPath, async (req, res) => {
+      if (!isHostAllowed(req.headers.host)) {
+        return res.status(403).json({ error: "Host not allowed" });
+      }
+      if (!isOriginAllowed(req.headers.origin as string | undefined)) {
+        return res.status(403).json({ error: "Origin not allowed" });
+      }
+      try {
+        await gateway.transport.handleRequest(req, res, req.body);
+      } catch (err) {
+        logger.error({ err }, "Gateway transport error");
+        res.status(500).json({ error: "Gateway error" });
+      }
+    });
+  }
 
   app.listen(config.port, () => {
     logger.info({ port: config.port }, "SmartThings MCP server listening");

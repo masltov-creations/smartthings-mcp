@@ -10,7 +10,9 @@ And now for something completely automated.
 - SmartApp lifecycle handling with webhook signature verification.
 - Comprehensive MCP tool surface: devices, status, commands, scenes, rules.
 - Hardened by default: minimal scopes, strict validation, no token leakage.
- - Status endpoint that is crisp, candid, and mildly amused.
+- Status endpoint that is crisp, candid, and mildly amused.
+- `mcporter`-direct workflow by default (lowest complexity).
+- Optional MCP gateway with named upstreams for multi-server setups.
 
 ## Quickstart (WSL2)
 1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
@@ -59,6 +61,87 @@ cp SKILL.md <workspace>/skills/smartthings-mcp/SKILL.md
 ```
 
 Then start a new OpenClaw session so it picks up the new skill.
+
+## OpenClaw + mcporter (Direct, Recommended)
+OpenClaw does not currently use an `mcpServers` block in `~/.openclaw/openclaw.json`. Use `mcporter` to call MCP servers directly.
+
+### 1. Add the SmartThings MCP endpoint
+No global install required:
+```bash
+npx -y mcporter config add smartthings https://<your-domain>/mcp --scope home
+```
+
+Inspect available tools:
+```bash
+npx -y mcporter list smartthings --schema
+```
+
+Call SmartThings tools:
+```bash
+npx -y mcporter call --server smartthings --tool list_locations
+npx -y mcporter call --server smartthings --tool list_devices
+```
+
+### 2. Add more MCP servers directly (no gateway)
+```bash
+npx -y mcporter config add playwright https://mcp.example.com/mcp --scope home
+npx -y mcporter list playwright --schema
+```
+
+If a server needs headers:
+```bash
+npx -y mcporter config add playwright https://mcp.example.com/mcp \
+  --header "Authorization=Bearer ${PLAYWRIGHT_MCP_TOKEN}" --scope home
+```
+
+## Optional Gateway (Advanced, Multi-Client)
+Use the built-in gateway only if you need one shared MCP endpoint with named upstreams.
+
+Enable gateway mode:
+```bash
+MCP_GATEWAY_ENABLED=true ./scripts/setup.sh
+```
+
+Gateway endpoint:
+- `POST /mcp-gateway`
+
+Manage upstreams:
+```bash
+./scripts/manage-upstreams.sh
+./scripts/setup.sh upstreams
+```
+
+Example `config/upstreams.json`:
+```json
+{
+  "upstreams": [
+    {
+      "name": "smartthings",
+      "url": "http://localhost:8080/mcp",
+      "description": "Local SmartThings MCP"
+    },
+    {
+      "name": "playwright",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PLAYWRIGHT_MCP_TOKEN}"
+      }
+    }
+  ]
+}
+```
+
+Call through gateway:
+```bash
+npx -y mcporter config add stproxy https://<your-domain>/mcp-gateway --scope home
+npx -y mcporter call --server stproxy --tool gateway.list_upstreams
+npx -y mcporter call --server stproxy --tool smartthings.list_locations
+```
+
+Operational notes:
+- Names must be unique and use `A-Z a-z 0-9 _ -` (no dots).
+- SmartThings MCP does not require auth headers by default.
+- Cleanup options: `./scripts/cleanup.sh --soft|--purge` or `./scripts/setup.sh cleanup ...`.
 
 ## Status
 Status endpoint: `GET /healthz`

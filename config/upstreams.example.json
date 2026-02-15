@@ -1,0 +1,17 @@
+{
+  "upstreams": [
+    {
+      "name": "smartthings",
+      "url": "http://localhost:8080/mcp",
+      "description": "Local SmartThings MCP"
+    },
+    {
+      "name": "playwright",
+      "url": "https://mcp.example.com/mcp",
+      "description": "Example upstream (replace URL)",
+      "headers": {
+        "Authorization": "Bearer ${PLAYWRIGHT_MCP_TOKEN}"
+      }
+    }
+  ]
+}

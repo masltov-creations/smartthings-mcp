@@ -22,11 +22,24 @@ Then restart WSL.
 ./scripts/setup.sh
 ```
 
+Direct upstream manager mode from setup script:
+```
+./scripts/setup.sh upstreams
+```
+
+Cleanup mode from setup script:
+```
+./scripts/setup.sh cleanup --soft
+./scripts/setup.sh cleanup --purge --dry-run
+```
+
 The setup script will:
 - Create or reuse a Cloudflare Tunnel
 - Create DNS for a stable hostname
 - Generate config and systemd unit files
 - Create `.env` and `.env.example`
+- Default to direct MCP mode (`/mcp`) for simpler `mcporter` usage
+- Optionally enable gateway mode (`/mcp-gateway`) when `MCP_GATEWAY_ENABLED=true`
 - Enable and start services
 
 Service unit templates are available in `systemd/` for reference.
@@ -41,6 +54,8 @@ You can also preseed via env vars:
 - `HOSTNAME=st-mcp.example.com` (Cloudflare)
 - `NGROK_DOMAIN=my-app.ngrok-free.app` (ngrok)
 - `NGROK_AUTHTOKEN=...` (ngrok)
+- `MCP_GATEWAY_ENABLED=true|false` (default: `false`)
+- `MANAGE_UPSTREAMS_NOW=y|n` (open or skip upstream manager prompt)
 
 To force re-entering SmartThings credentials on re-run:
 - `FORCE_REENTER_CREDS=true ./scripts/setup.sh`
@@ -59,6 +74,115 @@ If you update `.env` later, restart the service:
 ```
 sudo systemctl restart smartthings-mcp.service
 ```
+
+## Default Mode: Direct MCP (Recommended)
+Use `mcporter` to call SmartThings directly at `/mcp`.
+
+Example:
+```bash
+npx -y mcporter config add smartthings https://<your-domain>/mcp --scope home
+npx -y mcporter list smartthings --schema
+npx -y mcporter call --server smartthings --tool list_locations
+```
+
+## Gateway: Named Upstreams (Optional Advanced Mode)
+The gateway provides a single MCP endpoint that routes to multiple MCP servers using namespaced tools: `<upstream>.<tool>`.
+
+Default endpoints:
+- SmartThings MCP: `/mcp`
+- Gateway (multi-upstream): `/mcp-gateway`
+
+Enable gateway mode:
+```bash
+MCP_GATEWAY_ENABLED=true ./scripts/setup.sh
+```
+
+Config lives in `config/upstreams.json`. Edit this file to add/remove upstreams:
+```
+{
+  "upstreams": [
+    {
+      "name": "smartthings",
+      "url": "http://localhost:8080/mcp",
+      "description": "Local SmartThings MCP"
+    }
+  ]
+}
+```
+
+Notes:
+- Names must be unique and use `A-Z a-z 0-9 _ -` (no dots).
+- SmartThings MCP does **not** require auth headers by default.
+- If an upstream requires auth, add static headers:
+```
+{
+  "name": "example",
+  "url": "https://mcp.example.com/mcp",
+  "headers": {
+    "Authorization": "Bearer ${EXAMPLE_MCP_TOKEN}"
+  }
+}
+```
+- Reload by restarting the service or call the tool `gateway.reload_upstreams`.
+
+Disable gateway mode later:
+```bash
+MCP_GATEWAY_ENABLED=false ./scripts/setup.sh
+```
+
+### Upstream Config Manager
+You can manage namespaces anytime without re-running full setup:
+```
+./scripts/manage-upstreams.sh
+```
+
+Or via the setup script passthrough:
+```
+./scripts/setup.sh upstreams
+```
+
+Available commands:
+```
+./scripts/manage-upstreams.sh --list
+./scripts/manage-upstreams.sh --view
+./scripts/manage-upstreams.sh --add
+./scripts/manage-upstreams.sh --remove
+./scripts/manage-upstreams.sh --edit
+./scripts/manage-upstreams.sh --reset
+./scripts/manage-upstreams.sh --ensure-smartthings
+```
+
+## Cleanup / Uninstall Options
+Use cleanup when you want to stop services or remove generated runtime/config artifacts.
+
+Soft cleanup (safe default, keep configs/secrets):
+```
+./scripts/cleanup.sh --soft
+```
+
+Purge cleanup (remove service units and generated local files):
+```
+./scripts/cleanup.sh --purge
+```
+
+Purge and also remove `.env`:
+```
+./scripts/cleanup.sh --purge --remove-env
+```
+
+Preview without changes:
+```
+./scripts/cleanup.sh --purge --dry-run
+```
+
+You can also call cleanup through setup:
+```
+./scripts/setup.sh cleanup --purge --dry-run
+```
+
+To make the gateway the primary endpoint, set:
+- `MCP_GATEWAY_PATH=/mcp`
+- `MCP_HTTP_PATH=/mcp-smartthings`
 
 ## Logs
 By default logs are written to:

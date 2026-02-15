@@ -61,6 +61,7 @@ SMARTTHINGS_CLIENT_ID=
 SMARTTHINGS_CLIENT_SECRET=
 SMARTTHINGS_WEBHOOK_PATH=/smartthings
 MCP_HTTP_PATH=/mcp
+MCP_GATEWAY_PATH=/mcp-gateway
 SMARTTHINGS_OAUTH_TOKEN_URL=https://api.smartthings.com/oauth/token
 SMARTTHINGS_OAUTH_AUTHORIZE_URL=https://api.smartthings.com/oauth/authorize
 SMARTTHINGS_API_BASE_URL=https://api.smartthings.com/v1
@@ -70,6 +71,14 @@ TOKEN_STORE_PATH=$ROOT_DIR/data/token-store.json
 OAUTH_SCOPES=r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*
 OAUTH_REDIRECT_PATH=/oauth/callback
 LOG_LEVEL=info
+LOG_FILE=$ROOT_DIR/data/smartthings-mcp.log
+E2E_CHECK_ENABLED=true
+E2E_CHECK_INTERVAL_SEC=300
+E2E_CHECK_TIMEOUT_MS=5000
+MCP_GATEWAY_ENABLED=false
+UPSTREAMS_CONFIG_PATH=$ROOT_DIR/config/upstreams.json
+UPSTREAMS_REFRESH_INTERVAL_SEC=300
+UPSTREAMS_REQUEST_TIMEOUT_MS=15000
 ENV
 }
 
@@ -103,6 +112,42 @@ read_env_value() {
   fi
   grep -E "^${key}=" "$ROOT_DIR/.env" | head -n1 | cut -d= -f2-
 }
+
+if [ "${1:-}" = "upstreams" ] || [ "${1:-}" = "--upstreams" ]; then
+  ensure_env_file
+
+  PORT_VALUE=$(read_env_value PORT || true)
+  PORT_VALUE=${PORT_VALUE:-8080}
+
+  MCP_HTTP_PATH_VALUE=$(read_env_value MCP_HTTP_PATH || true)
+  MCP_HTTP_PATH_VALUE=${MCP_HTTP_PATH_VALUE:-/mcp}
+
+  UPSTREAMS_CONFIG_PATH_VALUE=$(read_env_value UPSTREAMS_CONFIG_PATH || true)
+  UPSTREAMS_CONFIG_PATH_VALUE=${UPSTREAMS_CONFIG_PATH_VALUE:-$ROOT_DIR/config/upstreams.json}
+
+  UPSTREAM_MANAGER_SCRIPT="$ROOT_DIR/scripts/manage-upstreams.sh"
+  if [ ! -f "$UPSTREAM_MANAGER_SCRIPT" ]; then
+    fail "Upstream manager not found at $UPSTREAM_MANAGER_SCRIPT"
+  fi
+
+  shift
+  UPSTREAMS_CONFIG_PATH="$UPSTREAMS_CONFIG_PATH_VALUE" \
+  SMARTTHINGS_LOCAL_MCP_URL="http://localhost:$PORT_VALUE$MCP_HTTP_PATH_VALUE" \
+  PORT="$PORT_VALUE" \
+  MCP_HTTP_PATH="$MCP_HTTP_PATH_VALUE" \
+  bash "$UPSTREAM_MANAGER_SCRIPT" "$@"
+  exit 0
+fi
+
+if [ "${1:-}" = "cleanup" ] || [ "${1:-}" = "--cleanup" ]; then
+  CLEANUP_SCRIPT="$ROOT_DIR/scripts/cleanup.sh"
+  if [ ! -f "$CLEANUP_SCRIPT" ]; then
+    fail "Cleanup script not found at $CLEANUP_SCRIPT"
+  fi
+  shift
+  bash "$CLEANUP_SCRIPT" "$@"
+  exit 0
+fi
 
 require_cmd node
 require_cmd npm
@@ -268,6 +313,7 @@ update_env PORT "$PORT"
 update_env ALLOWED_MCP_HOSTS "localhost,127.0.0.1,$PUBLIC_HOST"
 set_env_default SMARTTHINGS_WEBHOOK_PATH "/smartthings"
 set_env_default MCP_HTTP_PATH "/mcp"
+set_env_default MCP_GATEWAY_PATH "/mcp-gateway"
 set_env_default SMARTTHINGS_OAUTH_TOKEN_URL "https://api.smartthings.com/oauth/token"
 set_env_default SMARTTHINGS_OAUTH_AUTHORIZE_URL "https://api.smartthings.com/oauth/authorize"
 set_env_default SMARTTHINGS_API_BASE_URL "https://api.smartthings.com/v1"
@@ -281,6 +327,83 @@ set_env_default LOG_FILE "$ROOT_DIR/data/smartthings-mcp.log"
 set_env_default E2E_CHECK_ENABLED "true"
 set_env_default E2E_CHECK_INTERVAL_SEC "300"
 set_env_default E2E_CHECK_TIMEOUT_MS "5000"
+set_env_default MCP_GATEWAY_ENABLED "false"
+set_env_default UPSTREAMS_CONFIG_PATH "$ROOT_DIR/config/upstreams.json"
+set_env_default UPSTREAMS_REFRESH_INTERVAL_SEC "300"
+set_env_default UPSTREAMS_REQUEST_TIMEOUT_MS "15000"
+
+MCP_GATEWAY_ENABLED_VALUE=${MCP_GATEWAY_ENABLED:-}
+if [ -z "$MCP_GATEWAY_ENABLED_VALUE" ]; then
+  MCP_GATEWAY_ENABLED_VALUE=$(read_env_value MCP_GATEWAY_ENABLED || true)
+fi
+MCP_GATEWAY_ENABLED_VALUE=$(printf "%s" "$MCP_GATEWAY_ENABLED_VALUE" | tr '[:upper:]' '[:lower:]')
+case "$MCP_GATEWAY_ENABLED_VALUE" in
+  1|true|yes|y)
+    MCP_GATEWAY_ENABLED_VALUE="true"
+    ;;
+  *)
+    MCP_GATEWAY_ENABLED_VALUE="false"
+    ;;
+esac
+update_env MCP_GATEWAY_ENABLED "$MCP_GATEWAY_ENABLED_VALUE"
+
+MCP_HTTP_PATH_VALUE=$(read_env_value MCP_HTTP_PATH || true)
+MCP_HTTP_PATH_VALUE=${MCP_HTTP_PATH_VALUE:-/mcp}
+
+UPSTREAMS_CONFIG_PATH_VALUE=$(read_env_value UPSTREAMS_CONFIG_PATH || true)
+UPSTREAMS_CONFIG_PATH_VALUE=${UPSTREAMS_CONFIG_PATH_VALUE:-$ROOT_DIR/config/upstreams.json}
+
+ensure_upstreams_config() {
+  local file="$1"
+  if [ -f "$file" ]; then
+    return
+  fi
+  log "Creating upstreams config"
+  mkdir -p "$(dirname "$file")"
+  cat > "$file" <<CFG
+{
+  "upstreams": [
+    {
+      "name": "smartthings",
+      "url": "http://localhost:$PORT$MCP_HTTP_PATH_VALUE",
+      "description": "Local SmartThings MCP"
+    }
+  ]
+}
+CFG
+}
+
+if [ "$MCP_GATEWAY_ENABLED_VALUE" = "true" ]; then
+  ensure_upstreams_config "$UPSTREAMS_CONFIG_PATH_VALUE"
+fi
+
+UPSTREAM_MANAGER_SCRIPT="$ROOT_DIR/scripts/manage-upstreams.sh"
+if [ "$MCP_GATEWAY_ENABLED_VALUE" = "true" ] && [ -f "$UPSTREAM_MANAGER_SCRIPT" ]; then
+  log "Checking upstream namespaces"
+  UPSTREAMS_CONFIG_PATH="$UPSTREAMS_CONFIG_PATH_VALUE" \
+  SMARTTHINGS_LOCAL_MCP_URL="http://localhost:$PORT$MCP_HTTP_PATH_VALUE" \
+  PORT="$PORT" \
+  MCP_HTTP_PATH="$MCP_HTTP_PATH_VALUE" \
+  bash "$UPSTREAM_MANAGER_SCRIPT" --ensure-smartthings
+
+  MANAGE_UPSTREAMS_NOW=${MANAGE_UPSTREAMS_NOW:-}
+  if [ -z "$MANAGE_UPSTREAMS_NOW" ]; then
+    read -rp "Open upstream config manager now (add/view/edit/remove namespaces)? [y/N]: " MANAGE_UPSTREAMS_NOW
+  fi
+  if printf "%s" "$MANAGE_UPSTREAMS_NOW" | grep -qi '^y'; then
+    UPSTREAMS_CONFIG_PATH="$UPSTREAMS_CONFIG_PATH_VALUE" \
+    SMARTTHINGS_LOCAL_MCP_URL="http://localhost:$PORT$MCP_HTTP_PATH_VALUE" \
+    PORT="$PORT" \
+    MCP_HTTP_PATH="$MCP_HTTP_PATH_VALUE" \
+    bash "$UPSTREAM_MANAGER_SCRIPT"
+  fi
+else
+  if [ "$MCP_GATEWAY_ENABLED_VALUE" = "true" ]; then
+    log "Upstream manager not found at $UPSTREAM_MANAGER_SCRIPT"
+  else
+    log "MCP gateway disabled (direct MCP mode)"
+  fi
+fi
 
 CLIENT_ID=${SMARTTHINGS_CLIENT_ID:-}
 CLIENT_SECRET=${SMARTTHINGS_CLIENT_SECRET:-}
@@ -393,3 +516,9 @@ sudo systemctl restart smartthings-mcp.service
 
 log "Setup complete"
 log "Authorize once: $PUBLIC_URL/oauth/start"
+if [ "$MCP_GATEWAY_ENABLED_VALUE" = "true" ]; then
+  log "Gateway enabled at: $PUBLIC_URL$(read_env_value MCP_GATEWAY_PATH || true)"
+else
+  log "Direct MCP endpoint: $PUBLIC_URL$(read_env_value MCP_HTTP_PATH || true)"
+  log "Enable gateway later with: MCP_GATEWAY_ENABLED=true ./scripts/setup.sh"
+fi

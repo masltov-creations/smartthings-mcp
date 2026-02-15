@@ -22,6 +22,7 @@ const schema = z.object({
   OAUTH_SCOPES: z.string().default("r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*"),
   TOKEN_STORE_PATH: z.string().default("data/token-store.json"),
   LOG_LEVEL: z.string().default("info"),
+  LOG_FILE: z.string().optional(),
   SMARTTHINGS_VERIFY_SIGNATURES: z.string().optional(),
   SIGNATURE_TOLERANCE_SEC: z.coerce.number().int().positive().default(300),
   ALLOWED_MCP_HOSTS: z.string().optional(),
@@ -51,6 +52,7 @@ export const config = {
   oauthScopes: env.OAUTH_SCOPES.split(/\s+/).map((s) => s.trim()).filter(Boolean),
   tokenStorePath: env.TOKEN_STORE_PATH,
   logLevel: env.LOG_LEVEL,
+  logFile: env.LOG_FILE && env.LOG_FILE.trim().length > 0 ? env.LOG_FILE.trim() : undefined,
   verifySignatures: boolFromEnv(env.SMARTTHINGS_VERIFY_SIGNATURES, true),
   signatureToleranceSec: env.SIGNATURE_TOLERANCE_SEC,
   allowedMcpHosts: env.ALLOWED_MCP_HOSTS

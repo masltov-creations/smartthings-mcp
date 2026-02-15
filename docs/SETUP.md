@@ -60,6 +60,13 @@ If you update `.env` later, restart the service:
 sudo systemctl restart smartthings-mcp.service
 ```
 
+## Logs
+By default logs are written to:
+```
+data/smartthings-mcp.log
+```
+You can change the path via `LOG_FILE` in `.env`.
+
 ## Cloudflare Tunnel (Manual, Step-by-Step)
 If you prefer to set up Cloudflare Tunnel yourself, follow this exact sequence:
 

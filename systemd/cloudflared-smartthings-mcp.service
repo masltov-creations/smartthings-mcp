@@ -1,0 +1,13 @@
+[Unit]
+Description=Cloudflare Tunnel for SmartThings MCP
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+ExecStart=/usr/bin/cloudflared --config /path/to/SmartThingsMCP/cloudflared/config.yml tunnel run
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

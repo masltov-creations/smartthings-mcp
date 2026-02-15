@@ -1,0 +1,15 @@
+[Unit]
+Description=SmartThings MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/path/to/SmartThingsMCP
+EnvironmentFile=/path/to/SmartThingsMCP/.env
+ExecStart=/usr/bin/node /path/to/SmartThingsMCP/dist/index.js
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

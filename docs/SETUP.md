@@ -7,6 +7,7 @@ This project targets WSL2 with systemd enabled. A single command performs the fu
 - Node.js (LTS)
 - SmartThings CLI (optional for app registration)
 - Cloudflare account and domain (for durable URL)
+- Cloudflared installed in WSL2
 
 ## WSL2 Systemd Check
 Ensure `/etc/wsl.conf` contains:
@@ -44,3 +45,43 @@ If you update `.env` later, restart the service:
 ```
 sudo systemctl restart smartthings-mcp.service
 ```
+
+## Cloudflare Tunnel (Manual, Step-by-Step)
+If you prefer to set up Cloudflare Tunnel yourself, follow this exact sequence:
+
+1. Add your domain to Cloudflare and point your nameservers to Cloudflare.  
+   Reference: [Add a site to Cloudflare](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/)
+2. Install `cloudflared` for Linux (WSL2). Use Cloudflare’s downloads page for the latest method.  
+   Reference: [Cloudflared downloads](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+3. Log in to Cloudflare from WSL2:
+```
+cloudflared tunnel login
+```
+   Reference: [Cloudflared tunnel commands](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/cli-commands/)
+4. Create a named tunnel (this generates a credentials JSON file in `~/.cloudflared/`):
+```
+cloudflared tunnel create smartthings-mcp
+```
+   Reference: [Cloudflared tunnel commands](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/cli-commands/)
+5. Create a config file (example below) and include a catch‑all rule:
+```
+tunnel: <TUNNEL-UUID>
+credentials-file: /home/<user>/.cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  - hostname: st-mcp.example.com
+    service: http://localhost:8080
+  - service: http_status:404
+```
+   Reference: [Tunnel configuration file](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/local-management/configuration-file/)
+6. Create a DNS CNAME record for your hostname pointing to `<TUNNEL-UUID>.cfargotunnel.com`.  
+   Reference: [Create DNS records](https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/)
+7. Run as a service:
+```
+cloudflared service install
+systemctl start cloudflared
+systemctl status cloudflared
+```
+   Reference: [Run cloudflared as a service](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/local-management/as-a-service/linux/)
+
+Note: the setup script automates these steps and writes `cloudflared/config.yml` for you.

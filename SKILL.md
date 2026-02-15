@@ -17,12 +17,27 @@ Operate the SmartThings MCP server confidently: connect, verify access, and use 
 - OAuth has been completed at `/oauth/start`.
 - `PUBLIC_URL` and `ALLOWED_MCP_HOSTS` are set correctly.
 
+**Endpoints**
+- Health: `GET /healthz`
+- OAuth start: `GET /oauth/start`
+- MCP: `POST /mcp` (requires `Accept: text/event-stream` for SSE)
+
 **Quick Start**
 1. Confirm health: `GET /healthz` returns `{ ok: true }`.
 2. Confirm OAuth: visit `https://<your-domain>/oauth/start` once.
 3. Call `list_locations` to confirm access.
 4. Call `list_devices` to discover device IDs.
 5. Use `get_device_status` or `send_device_command`.
+
+**Manual MCP Test (SSE)**
+Most clients (OpenClaw, MCP SDKs) handle this automatically. If you test manually, you must send `Accept: text/event-stream`:
+```
+curl -N \
+  -H "Accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+  https://<your-domain>/mcp
+```
 
 **Tool Map**
 - `list_locations`: verify OAuth and discover location IDs.

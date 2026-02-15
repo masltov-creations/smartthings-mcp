@@ -41,6 +41,8 @@ The setup script will:
 - Default to direct MCP mode (`/mcp`) for simpler `mcporter` usage
 - Optionally enable gateway mode (`/mcp-gateway`) when `MCP_GATEWAY_ENABLED=true`
 - Enable and start services
+- Wait for local/public `/healthz` to become reachable (to avoid tunnel warmup false alarms)
+- Optionally walk OAuth completion and confirm `e2e=pass`
 
 Service unit templates are available in `systemd/` for reference.
 
@@ -64,6 +66,8 @@ You can also preseed via env vars:
 - `CONFIGURE_MCPORTER=true|false` (default prompt: yes)
 - `VERIFY_MCPORTER=true|false` (default prompt: yes when mcporter is configured)
 - `MCPORTER_SERVER_NAME=smartthings` (mcporter alias to create/update)
+- `STARTUP_HEALTH_TIMEOUT_SEC=90` (wait budget for local/public health checks)
+- `OAUTH_E2E_TIMEOUT_SEC=240` (wait budget for post-auth e2e confirmation)
 
 To force re-entering SmartThings credentials on re-run:
 - `FORCE_REENTER_CREDS=true ./scripts/setup.sh`

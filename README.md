@@ -46,27 +46,23 @@ Optional (for testing in the SmartThings app):
 See `SKILL.md` for the MCP usage skill and operational best practices.
 
 ## OpenClaw: Install the Skill
-OpenClaw skills are Markdown files with YAML frontmatter, loaded from these locations (in order): `<workspace>/skills`, `~/.openclaw/skills`, then bundled skills. You can also add extra skill folders via `skills.load.extraDirs` in `~/.openclaw/openclaw.json`.
+`./scripts/setup.sh` now offers to do this automatically:
+- installs `SKILL.md` to `~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md`
+- installs to global OpenClaw skills when `/usr/lib/node_modules/openclaw/skills` exists
 
-Option A (recommended for local use):
-```
-mkdir -p ~/.openclaw/skills/smartthings-mcp
-cp SKILL.md ~/.openclaw/skills/smartthings-mcp/SKILL.md
-```
-
-Option B (workspace skill):
-```
-mkdir -p <workspace>/skills/smartthings-mcp
-cp SKILL.md <workspace>/skills/smartthings-mcp/SKILL.md
+Manual fallback:
+```bash
+mkdir -p ~/.openclaw/workspace/skills/smartthings-mcp
+cp SKILL.md ~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md
 ```
 
-Then start a new OpenClaw session so it picks up the new skill.
+Then start a new OpenClaw session so it picks up the skill.
 
 ## OpenClaw + mcporter (Direct, Recommended)
 OpenClaw does not currently use an `mcpServers` block in `~/.openclaw/openclaw.json`. Use `mcporter` to call MCP servers directly.
 
 ### 1. Add the SmartThings MCP endpoint
-No global install required:
+`./scripts/setup.sh` now offers to run this for you automatically:
 ```bash
 npx -y mcporter config add smartthings https://<your-domain>/mcp --scope home
 ```

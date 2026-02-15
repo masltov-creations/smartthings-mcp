@@ -56,6 +56,9 @@ You can also preseed via env vars:
 - `NGROK_AUTHTOKEN=...` (ngrok)
 - `MCP_GATEWAY_ENABLED=true|false` (default: `false`)
 - `MANAGE_UPSTREAMS_NOW=y|n` (open or skip upstream manager prompt)
+- `INSTALL_OPENCLAW_SKILL=true|false` (default prompt: yes)
+- `CONFIGURE_MCPORTER=true|false` (default prompt: yes)
+- `MCPORTER_SERVER_NAME=smartthings` (mcporter alias to create/update)
 
 To force re-entering SmartThings credentials on re-run:
 - `FORCE_REENTER_CREDS=true ./scripts/setup.sh`
@@ -74,6 +77,11 @@ If you update `.env` later, restart the service:
 ```
 sudo systemctl restart smartthings-mcp.service
 ```
+
+Setup can also handle OpenClaw wiring in one run:
+- Install `SKILL.md` into `~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md`.
+- Install `SKILL.md` into `/usr/lib/node_modules/openclaw/skills/smartthings-mcp/SKILL.md` when global OpenClaw exists.
+- Create/update a `mcporter` server entry using your configured public endpoint.
 
 ## Default Mode: Direct MCP (Recommended)
 Use `mcporter` to call SmartThings directly at `/mcp`.

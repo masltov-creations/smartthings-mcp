@@ -288,6 +288,16 @@ if [ -z "$CLIENT_SECRET" ]; then
   CLIENT_SECRET=$(read_env_value SMARTTHINGS_CLIENT_SECRET || true)
 fi
 
+FORCE_REENTER_CREDS=${FORCE_REENTER_CREDS:-}
+if [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ] && [ -z "$FORCE_REENTER_CREDS" ]; then
+  read -rp "Use existing SmartThings credentials from .env? [Y/n]: " USE_EXISTING
+  USE_EXISTING=${USE_EXISTING:-y}
+  if printf "%s" "$USE_EXISTING" | grep -qi "^n"; then
+    CLIENT_ID=""
+    CLIENT_SECRET=""
+  fi
+fi
+
 if [ -z "$CLIENT_ID" ]; then
   read -rp "SmartThings Client ID: " CLIENT_ID
 fi

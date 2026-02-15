@@ -26,7 +26,10 @@ const schema = z.object({
   SMARTTHINGS_VERIFY_SIGNATURES: z.string().optional(),
   SIGNATURE_TOLERANCE_SEC: z.coerce.number().int().positive().default(300),
   ALLOWED_MCP_HOSTS: z.string().optional(),
-  ACTIVE_INSTALLED_APP_ID: z.string().optional()
+  ACTIVE_INSTALLED_APP_ID: z.string().optional(),
+  E2E_CHECK_ENABLED: z.string().optional(),
+  E2E_CHECK_INTERVAL_SEC: z.coerce.number().int().positive().default(300),
+  E2E_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(5000)
 });
 
 const parsed = schema.safeParse(process.env);
@@ -58,5 +61,8 @@ export const config = {
   allowedMcpHosts: env.ALLOWED_MCP_HOSTS
     ? env.ALLOWED_MCP_HOSTS.split(",").map((s) => s.trim()).filter(Boolean)
     : [],
-  activeInstalledAppId: env.ACTIVE_INSTALLED_APP_ID
+  activeInstalledAppId: env.ACTIVE_INSTALLED_APP_ID,
+  e2eCheckEnabled: boolFromEnv(env.E2E_CHECK_ENABLED, true),
+  e2eCheckIntervalSec: env.E2E_CHECK_INTERVAL_SEC,
+  e2eCheckTimeoutMs: env.E2E_CHECK_TIMEOUT_MS
 };

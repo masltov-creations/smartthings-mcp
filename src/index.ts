@@ -29,6 +29,76 @@ const store = new TokenStore(config.tokenStorePath);
 const smartAppHandler = createSmartAppHandler(store);
 const client = new SmartThingsClient(store);
 
+type E2EStatus = {
+  status: "pass" | "fail" | "unknown" | "not_authorized" | "disabled";
+  checkedAt?: string;
+  message?: string;
+};
+
+function createE2EChecker(
+  smartClient: SmartThingsClient,
+  intervalSec: number,
+  timeoutMs: number,
+  enabled: boolean
+) {
+  let running = false;
+  let last: E2EStatus = enabled ? { status: "unknown" } : { status: "disabled" };
+
+  const classifyError = (err: any): E2EStatus => {
+    const msg = String(err?.message ?? err ?? "Unknown error");
+    if (/no token records/i.test(msg)) return { status: "not_authorized", message: msg };
+    if (/missing required smartthings scope/i.test(msg)) return { status: "not_authorized", message: msg };
+    if (/invalid_grant/i.test(msg)) return { status: "not_authorized", message: msg };
+    if (/oauth/i.test(msg)) return { status: "not_authorized", message: msg };
+    if (/token refresh failed/i.test(msg)) return { status: "not_authorized", message: msg };
+    return { status: "fail", message: msg };
+  };
+
+  const runNow = async (): Promise<E2EStatus> => {
+    if (!enabled) return last;
+    if (running) return last;
+    running = true;
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("E2E check timed out")), timeoutMs)
+    );
+    try {
+      await Promise.race([smartClient.listLocations(), timeout]);
+      last = {
+        status: "pass",
+        checkedAt: new Date().toISOString(),
+        message: "list_locations ok"
+      };
+    } catch (err) {
+      const classified = classifyError(err);
+      last = { ...classified, checkedAt: new Date().toISOString() };
+    } finally {
+      running = false;
+    }
+    return last;
+  };
+
+  if (enabled) {
+    setTimeout(() => {
+      runNow().catch(() => undefined);
+    }, 2000);
+    setInterval(() => {
+      runNow().catch(() => undefined);
+    }, intervalSec * 1000);
+  }
+
+  return {
+    getStatus: () => last,
+    runNow
+  };
+}
+
+const e2eChecker = createE2EChecker(
+  client,
+  config.e2eCheckIntervalSec,
+  config.e2eCheckTimeoutMs,
+  config.e2eCheckEnabled
+);
+
 const publicHost = (() => {
   try {
     return new URL(config.publicUrl).hostname;
@@ -57,7 +127,11 @@ function isOriginAllowed(originHeader?: string): boolean {
   }
 }
 
-app.get("/healthz", async (_req, res) => {
+app.get("/healthz", async (req, res) => {
+  const runE2E =
+    typeof req.query.e2e === "string" && ["1", "true", "yes"].includes(req.query.e2e.toLowerCase());
+  const e2e = runE2E ? await e2eChecker.runNow() : e2eChecker.getStatus();
+  const go = e2e.status === "pass";
   res.status(200).json({
     ok: true,
     service: "smartthings-mcp",
@@ -65,7 +139,9 @@ app.get("/healthz", async (_req, res) => {
     time: new Date().toISOString(),
     uptimeSec: Math.floor(process.uptime()),
     mode: "operational",
-    quip: "All systems go. No goats were harmed."
+    e2e,
+    go,
+    quip: go ? "Green across the board." : "Poking the toaster. Stand by."
   });
 });
 

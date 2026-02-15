@@ -278,6 +278,9 @@ set_env_default OAUTH_SCOPES "r:locations:* r:devices:* x:devices:* r:scenes:* x
 set_env_default OAUTH_REDIRECT_PATH "/oauth/callback"
 set_env_default LOG_LEVEL "info"
 set_env_default LOG_FILE "$ROOT_DIR/data/smartthings-mcp.log"
+set_env_default E2E_CHECK_ENABLED "true"
+set_env_default E2E_CHECK_INTERVAL_SEC "300"
+set_env_default E2E_CHECK_TIMEOUT_MS "5000"
 
 CLIENT_ID=${SMARTTHINGS_CLIENT_ID:-}
 CLIENT_SECRET=${SMARTTHINGS_CLIENT_SECRET:-}

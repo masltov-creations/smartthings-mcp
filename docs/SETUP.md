@@ -67,6 +67,16 @@ data/smartthings-mcp.log
 ```
 You can change the path via `LOG_FILE` in `.env`.
 
+## E2E Health Check (Green Signal)
+The service performs a lightweight E2E check (SmartThings `list_locations`) on a timer and exposes the result:
+```
+GET /healthz
+```
+To force an immediate E2E check:
+```
+GET /healthz?e2e=1
+```
+
 ## Cloudflare Tunnel (Manual, Step-by-Step)
 If you prefer to set up Cloudflare Tunnel yourself, follow this exact sequence:
 

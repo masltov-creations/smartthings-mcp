@@ -1,9 +1,7 @@
-import crypto from "node:crypto";
 import { URL } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -156,12 +154,6 @@ class Gateway {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
     }
-  }
-
-  getTransport() {
-    return new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID()
-    });
   }
 
   async refreshNow(force = true) {
@@ -532,10 +524,8 @@ class Gateway {
 export async function createGateway() {
   const gateway = new Gateway();
   await gateway.init();
-  const transport = gateway.getTransport();
-  await gateway.getServer().connect(transport);
   return {
-    transport,
+    server: gateway.getServer(),
     status: () => gateway.getStatus(),
     reload: (force = true) => gateway.refreshNow(force)
   };

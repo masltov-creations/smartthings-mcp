@@ -170,6 +170,60 @@ configure_mcporter_server() {
   return 1
 }
 
+verify_mcporter_server() {
+  local server_name="$1"
+  local endpoint="$2"
+
+  if ! command -v npx >/dev/null 2>&1; then
+    log "npx not found; skipping mcporter verification"
+    return 0
+  fi
+
+  local config_json
+  config_json=$(mktemp)
+  if ! npx -y mcporter config get "$server_name" --json >"$config_json" 2>/dev/null; then
+    rm -f "$config_json"
+    log "mcporter verify failed: server \"$server_name\" not found in config"
+    return 1
+  fi
+
+  local verify_output
+  if ! verify_output=$(node - "$config_json" "$endpoint" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const expected = process.argv[3];
+const data = JSON.parse(fs.readFileSync(file, "utf8"));
+const actual = typeof data.baseUrl === "string" ? data.baseUrl : "";
+if (!actual) {
+  console.error("mcporter verify failed: baseUrl missing");
+  process.exit(1);
+}
+if (actual !== expected) {
+  console.error(`mcporter verify failed: baseUrl mismatch (${actual})`);
+  process.exit(1);
+}
+console.log(`mcporter config verified: ${actual}`);
+NODE
+  ); then
+    rm -f "$config_json"
+    log "$verify_output"
+    return 1
+  fi
+  rm -f "$config_json"
+  log "$verify_output"
+
+  local tools_output
+  tools_output=$(mktemp)
+  if npx -y mcporter list "$server_name" --schema >"$tools_output" 2>&1; then
+    log "mcporter tools/list check passed for \"$server_name\""
+  else
+    log "mcporter tools/list check warning (non-fatal):"
+    sed -n '1,12p' "$tools_output" >&2
+  fi
+  rm -f "$tools_output"
+  return 0
+}
+
 if [ "${1:-}" = "upstreams" ] || [ "${1:-}" = "--upstreams" ]; then
   ensure_env_file
 
@@ -600,6 +654,16 @@ CONFIGURE_MCPORTER_VALUE=${CONFIGURE_MCPORTER_VALUE:-y}
 if ! is_no "$CONFIGURE_MCPORTER_VALUE"; then
   if configure_mcporter_server "$MCPORTER_SERVER_NAME" "$MCP_SERVER_URL" "$MCP_TRANSPORT"; then
     log "mcporter server \"$MCPORTER_SERVER_NAME\" now points to $MCP_SERVER_URL"
+    VERIFY_MCPORTER_VALUE=${VERIFY_MCPORTER:-}
+    if [ -z "$VERIFY_MCPORTER_VALUE" ]; then
+      read -rp "Verify mcporter config and connectivity now? [Y/n]: " VERIFY_MCPORTER_VALUE
+    fi
+    VERIFY_MCPORTER_VALUE=${VERIFY_MCPORTER_VALUE:-y}
+    if ! is_no "$VERIFY_MCPORTER_VALUE"; then
+      verify_mcporter_server "$MCPORTER_SERVER_NAME" "$MCP_SERVER_URL" || true
+    else
+      log "Skipping mcporter verification"
+    fi
   else
     log "mcporter configuration failed. Run manually:"
     log "npx -y mcporter config add $MCPORTER_SERVER_NAME $MCP_SERVER_URL --transport $MCP_TRANSPORT --scope home"

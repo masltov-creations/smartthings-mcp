@@ -66,6 +66,7 @@ OpenClaw does not currently use an `mcpServers` block in `~/.openclaw/openclaw.j
 ```bash
 npx -y mcporter config add smartthings https://<your-domain>/mcp --scope home
 ```
+It also offers a verification pass (`mcporter config get` + `mcporter list --schema`).
 
 Inspect available tools:
 ```bash

@@ -58,6 +58,7 @@ You can also preseed via env vars:
 - `MANAGE_UPSTREAMS_NOW=y|n` (open or skip upstream manager prompt)
 - `INSTALL_OPENCLAW_SKILL=true|false` (default prompt: yes)
 - `CONFIGURE_MCPORTER=true|false` (default prompt: yes)
+- `VERIFY_MCPORTER=true|false` (default prompt: yes when mcporter is configured)
 - `MCPORTER_SERVER_NAME=smartthings` (mcporter alias to create/update)
 
 To force re-entering SmartThings credentials on re-run:
@@ -82,6 +83,7 @@ Setup can also handle OpenClaw wiring in one run:
 - Install `SKILL.md` into `~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md`.
 - Install `SKILL.md` into `/usr/lib/node_modules/openclaw/skills/smartthings-mcp/SKILL.md` when global OpenClaw exists.
 - Create/update a `mcporter` server entry using your configured public endpoint.
+- Verify that `mcporter` points at the expected URL and can list tools.
 
 ## Default Mode: Direct MCP (Recommended)
 Use `mcporter` to call SmartThings directly at `/mcp`.

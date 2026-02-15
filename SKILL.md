@@ -22,6 +22,17 @@ Operate the SmartThings MCP server confidently: connect, verify access, and use 
 - OAuth start: `GET /oauth/start`
 - MCP: `POST /mcp` (requires `Accept: text/event-stream` for SSE)
 
+**OpenClaw Config (Example)**
+```
+{
+  "mcpServers": {
+    "smartthings": {
+      "url": "https://<your-domain>/mcp"
+    }
+  }
+}
+```
+
 **Quick Start**
 1. Confirm health: `GET /healthz` returns `{ ok: true }`.
 2. Confirm OAuth: visit `https://<your-domain>/oauth/start` once.

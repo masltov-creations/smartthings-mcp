@@ -25,11 +25,19 @@ Operate the SmartThings MCP server confidently: connect, verify access, and use 
 - MCP (Gateway): `POST /mcp-gateway` (named upstreams, also SSE)
 
 **Quick Start**
-1. Confirm health: `GET /healthz` returns `{ ok: true }`.
-2. Confirm OAuth: visit `https://<your-domain>/oauth/start` once.
-3. Call `list_locations` to confirm access.
-4. Call `list_devices` to discover device IDs.
-5. Use `get_device_status` or `send_device_command`.
+1. Resolve endpoint from local config first:
+```
+npx -y mcporter config get smartthings --json
+```
+If missing, derive from repo `.env`:
+```
+BASE_URL="$(grep '^PUBLIC_URL=' .env | cut -d= -f2)"
+```
+2. Confirm health: `GET /healthz` returns `{ ok: true }`.
+3. Confirm OAuth: visit `https://<your-domain>/oauth/start` once.
+4. Call `list_locations` to confirm access.
+5. Call `list_devices` to discover device IDs.
+6. Use `get_device_status` or `send_device_command`.
 
 **OpenClaw + MCP Direct Workflow (Recommended)**
 OpenClaw does not use an `mcpServers` section in `~/.openclaw/openclaw.json`. Use `mcporter`:

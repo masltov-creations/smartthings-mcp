@@ -14,6 +14,19 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+is_no() {
+  local value
+  value=$(printf "%s" "${1:-}" | tr '[:upper:]' '[:lower:]')
+  case "$value" in
+    0|false|no|n)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 require_wsl_systemd() {
   if ! is_wsl; then
     log "WSL2 not detected. Proceeding anyway."
@@ -111,6 +124,50 @@ read_env_value() {
     return
   fi
   grep -E "^${key}=" "$ROOT_DIR/.env" | head -n1 | cut -d= -f2-
+}
+
+install_openclaw_skill() {
+  local workspace_skill_path="$HOME/.openclaw/workspace/skills/smartthings-mcp/SKILL.md"
+  local global_skills_dir="/usr/lib/node_modules/openclaw/skills"
+  local global_skill_path="$global_skills_dir/smartthings-mcp/SKILL.md"
+
+  mkdir -p "$(dirname "$workspace_skill_path")"
+  install -m 0644 "$ROOT_DIR/SKILL.md" "$workspace_skill_path"
+  log "Installed SKILL.md to $workspace_skill_path"
+
+  if [ -d "$global_skills_dir" ]; then
+    if sudo install -Dm644 "$ROOT_DIR/SKILL.md" "$global_skill_path"; then
+      log "Installed SKILL.md to $global_skill_path"
+    else
+      log "Could not install SKILL.md to $global_skill_path (continuing)"
+    fi
+  else
+    log "Global OpenClaw skills directory not found; workspace skill install only"
+  fi
+}
+
+configure_mcporter_server() {
+  local server_name="$1"
+  local endpoint="$2"
+  local transport="$3"
+
+  if ! command -v npx >/dev/null 2>&1; then
+    log "npx not found; skipping mcporter config"
+    return 0
+  fi
+
+  local output_file
+  output_file=$(mktemp)
+  if npx -y mcporter config add "$server_name" "$endpoint" --transport "$transport" --scope home >"$output_file" 2>&1; then
+    log "$(cat "$output_file")"
+    rm -f "$output_file"
+    return 0
+  fi
+
+  log "mcporter config add failed:"
+  cat "$output_file" >&2
+  rm -f "$output_file"
+  return 1
 }
 
 if [ "${1:-}" = "upstreams" ] || [ "${1:-}" = "--upstreams" ]; then
@@ -513,6 +570,43 @@ elif [ "$TUNNEL_PROVIDER" = "ngrok" ]; then
 fi
 sudo systemctl enable --now smartthings-mcp.service
 sudo systemctl restart smartthings-mcp.service
+
+MCP_PATH_FOR_CLIENTS=$(read_env_value MCP_HTTP_PATH || true)
+MCP_PATH_FOR_CLIENTS=${MCP_PATH_FOR_CLIENTS:-/mcp}
+MCP_TRANSPORT="http"
+if [ "$MCP_GATEWAY_ENABLED_VALUE" = "true" ]; then
+  MCP_PATH_FOR_CLIENTS=$(read_env_value MCP_GATEWAY_PATH || true)
+  MCP_PATH_FOR_CLIENTS=${MCP_PATH_FOR_CLIENTS:-/mcp-gateway}
+fi
+MCP_SERVER_URL="$PUBLIC_URL$MCP_PATH_FOR_CLIENTS"
+MCPORTER_SERVER_NAME=${MCPORTER_SERVER_NAME:-smartthings}
+
+INSTALL_OPENCLAW_SKILL_VALUE=${INSTALL_OPENCLAW_SKILL:-}
+if [ -z "$INSTALL_OPENCLAW_SKILL_VALUE" ]; then
+  read -rp "Install SKILL.md into OpenClaw skill folders now? [Y/n]: " INSTALL_OPENCLAW_SKILL_VALUE
+fi
+INSTALL_OPENCLAW_SKILL_VALUE=${INSTALL_OPENCLAW_SKILL_VALUE:-y}
+if ! is_no "$INSTALL_OPENCLAW_SKILL_VALUE"; then
+  install_openclaw_skill
+else
+  log "Skipping OpenClaw skill installation"
+fi
+
+CONFIGURE_MCPORTER_VALUE=${CONFIGURE_MCPORTER:-}
+if [ -z "$CONFIGURE_MCPORTER_VALUE" ]; then
+  read -rp "Configure mcporter server \"$MCPORTER_SERVER_NAME\" -> $MCP_SERVER_URL now? [Y/n]: " CONFIGURE_MCPORTER_VALUE
+fi
+CONFIGURE_MCPORTER_VALUE=${CONFIGURE_MCPORTER_VALUE:-y}
+if ! is_no "$CONFIGURE_MCPORTER_VALUE"; then
+  if configure_mcporter_server "$MCPORTER_SERVER_NAME" "$MCP_SERVER_URL" "$MCP_TRANSPORT"; then
+    log "mcporter server \"$MCPORTER_SERVER_NAME\" now points to $MCP_SERVER_URL"
+  else
+    log "mcporter configuration failed. Run manually:"
+    log "npx -y mcporter config add $MCPORTER_SERVER_NAME $MCP_SERVER_URL --transport $MCP_TRANSPORT --scope home"
+  fi
+else
+  log "Skipping mcporter configuration"
+fi
 
 log "Setup complete"
 log "Authorize once: $PUBLIC_URL/oauth/start"

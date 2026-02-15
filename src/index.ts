@@ -47,6 +47,16 @@ function isHostAllowed(hostHeader?: string): boolean {
   return allowedHosts.includes(host);
 }
 
+function isOriginAllowed(originHeader?: string): boolean {
+  if (!originHeader) return true;
+  try {
+    const origin = new URL(originHeader);
+    return allowedHosts.includes(origin.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 app.get("/healthz", async (_req, res) => {
   res.status(200).json({ ok: true });
 });
@@ -81,6 +91,9 @@ app.get(config.oauthRedirectPath, async (req, res) => {
   app.all(config.mcpPath, async (req, res) => {
     if (!isHostAllowed(req.headers.host)) {
       return res.status(403).json({ error: "Host not allowed" });
+    }
+    if (!isOriginAllowed(req.headers.origin as string | undefined)) {
+      return res.status(403).json({ error: "Origin not allowed" });
     }
     try {
       await transport.handleRequest(req, res, req.body);

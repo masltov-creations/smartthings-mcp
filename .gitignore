@@ -26,6 +26,10 @@ cloudflared/
 **/.cloudflared/
 cloudflared/config.yml
 
+# ngrok
+ngrok/
+**/ngrok/*.yml
+
 # OS
 .DS_Store
 Thumbs.db

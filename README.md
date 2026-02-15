@@ -15,13 +15,15 @@ And now for something completely automated.
 ## Quickstart (WSL2)
 1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
 2. Clone + enter repo: `git clone https://github.com/masltov-creations/smartthings-mcp && cd smartthings-mcp`
-3. Install `cloudflared` in WSL2 (see `docs/SETUP.md` for the step-by-step).
+3. Install your tunnel client (`cloudflared` or `ngrok`) in WSL2 (see `docs/SETUP.md`).
 4. Run setup: `./scripts/setup.sh`
 5. Authorize once: open `https://<your-domain>/oauth/start`
 
 Windows host option: `winget install Git.Git`
 Setup script runs `npm install` for you.
 No domain yet? See `docs/SETUP.md` for Quick Tunnel instructions (temporary only).
+Setup will prompt for Cloudflare or ngrok.
+If you choose ngrok, have a static domain and authtoken ready.
 
 ## SmartThings OAuth: 6-Step Checklist
 1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)

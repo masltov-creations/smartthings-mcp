@@ -38,56 +38,127 @@ MSG
   fi
 }
 
+normalize_host() {
+  local value="$1"
+  value=${value#https://}
+  value=${value#http://}
+  value=${value%%/*}
+  printf "%s" "$value"
+}
+
+escape_sed() {
+  printf "%s" "$1" | sed -e 's/[\\&|]/\\&/g'
+}
+
+ensure_env_file() {
+  if [ -f "$ROOT_DIR/.env" ]; then
+    return
+  fi
+
+  log "Creating .env"
+  cat > "$ROOT_DIR/.env" <<ENV
+SMARTTHINGS_CLIENT_ID=
+SMARTTHINGS_CLIENT_SECRET=
+SMARTTHINGS_WEBHOOK_PATH=/smartthings
+MCP_HTTP_PATH=/mcp
+SMARTTHINGS_OAUTH_TOKEN_URL=https://api.smartthings.com/oauth/token
+SMARTTHINGS_OAUTH_AUTHORIZE_URL=https://api.smartthings.com/oauth/authorize
+SMARTTHINGS_API_BASE_URL=https://api.smartthings.com/v1
+SMARTTHINGS_VERIFY_SIGNATURES=true
+SIGNATURE_TOLERANCE_SEC=300
+TOKEN_STORE_PATH=$ROOT_DIR/data/token-store.json
+OAUTH_SCOPES=r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*
+OAUTH_REDIRECT_PATH=/oauth/callback
+LOG_LEVEL=info
+ENV
+}
+
+update_env() {
+  local key="$1"
+  local value="$2"
+  local file="$ROOT_DIR/.env"
+  local esc_value
+  esc_value=$(escape_sed "$value")
+  if grep -q "^${key}=" "$file"; then
+    sed -i "s|^${key}=.*|${key}=${esc_value}|" "$file"
+  else
+    printf "%s=%s\n" "$key" "$value" >> "$file"
+  fi
+}
+
+set_env_default() {
+  local key="$1"
+  local value="$2"
+  local file="$ROOT_DIR/.env"
+  if grep -q "^${key}=" "$file"; then
+    return
+  fi
+  update_env "$key" "$value"
+}
+
+read_env_value() {
+  local key="$1"
+  if [ ! -f "$ROOT_DIR/.env" ]; then
+    return
+  fi
+  grep -E "^${key}=" "$ROOT_DIR/.env" | head -n1 | cut -d= -f2-
+}
+
 require_cmd node
 require_cmd npm
-require_cmd cloudflared
-require_cmd python3
 
 require_wsl_systemd
 
 NODE_BIN=$(command -v node)
-CLOUDFLARED_BIN=$(command -v cloudflared)
 
 if ! command -v smartthings >/dev/null 2>&1; then
   log "SmartThings CLI not found. You can create the OAuth app in Developer Workspace."
 fi
 
-log "Checking Cloudflare login"
-if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
-  log "Cloudflare login required. Opening login flow."
-  cloudflared tunnel login
+TUNNEL_PROVIDER=${TUNNEL_PROVIDER:-}
+if [ -z "$TUNNEL_PROVIDER" ]; then
+  read -rp "Tunnel provider ([c]loudflare/[n]grok) [cloudflare]: " TUNNEL_PROVIDER
 fi
 
-TUNNEL_NAME=${TUNNEL_NAME:-smartthings-mcp}
-HOSTNAME=${HOSTNAME:-}
+TUNNEL_PROVIDER=$(printf "%s" "$TUNNEL_PROVIDER" | tr '[:upper:]' '[:lower:]')
+if [ -z "$TUNNEL_PROVIDER" ] || [ "$TUNNEL_PROVIDER" = "c" ]; then
+  TUNNEL_PROVIDER="cloudflare"
+fi
+if [ "$TUNNEL_PROVIDER" = "n" ]; then
+  TUNNEL_PROVIDER="ngrok"
+fi
+
+PORT=${PORT:-}
+if [ -z "$PORT" ]; then
+  PORT=$(read_env_value PORT || true)
+fi
 PORT=${PORT:-8080}
+PUBLIC_HOST=""
 
-if [ -z "$HOSTNAME" ]; then
-  read -rp "Public hostname (e.g. st-mcp.example.com): " HOSTNAME
-fi
+if [ "$TUNNEL_PROVIDER" = "cloudflare" ]; then
+  require_cmd cloudflared
+  require_cmd python3
+  CLOUDFLARED_BIN=$(command -v cloudflared)
 
-if [ -z "$HOSTNAME" ]; then
-  fail "HOSTNAME is required"
-fi
+  log "Checking Cloudflare login"
+  if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
+    log "Cloudflare login required. Opening login flow."
+    cloudflared tunnel login
+  fi
 
-log "Resolving tunnel ID"
-TUNNEL_ID=$(cloudflared tunnel list --output json | python3 - <<PY
-import json,sys
-name = "$TUNNEL_NAME"
-try:
-    data = json.load(sys.stdin)
-except Exception:
-    data = []
-for t in data:
-    if t.get("name") == name:
-        print(t.get("id", ""))
-        break
-PY
-)
+  TUNNEL_NAME=${TUNNEL_NAME:-smartthings-mcp}
+  HOSTNAME=${HOSTNAME:-}
 
-if [ -z "$TUNNEL_ID" ]; then
-  log "Creating tunnel $TUNNEL_NAME"
-  cloudflared tunnel create "$TUNNEL_NAME" >/dev/null
+  if [ -z "$HOSTNAME" ]; then
+    read -rp "Public hostname (e.g. st-mcp.example.com): " HOSTNAME
+  fi
+
+  HOSTNAME=$(normalize_host "$HOSTNAME")
+  if [ -z "$HOSTNAME" ]; then
+    fail "HOSTNAME is required"
+  fi
+
+  log "Resolving tunnel ID"
   TUNNEL_ID=$(cloudflared tunnel list --output json | python3 - <<PY
 import json,sys
 name = "$TUNNEL_NAME"
@@ -100,20 +171,38 @@ for t in data:
         print(t.get("id", ""))
         break
 PY
-)
-fi
+  )
 
-if [ -z "$TUNNEL_ID" ]; then
-  fail "Failed to resolve tunnel ID"
-fi
+  if [ -z "$TUNNEL_ID" ]; then
+    log "Creating tunnel $TUNNEL_NAME"
+    cloudflared tunnel create "$TUNNEL_NAME" >/dev/null
+    TUNNEL_ID=$(cloudflared tunnel list --output json | python3 - <<PY
+import json,sys
+name = "$TUNNEL_NAME"
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    data = []
+for t in data:
+    if t.get("name") == name:
+        print(t.get("id", ""))
+        break
+PY
+    )
+  fi
 
-CRED_FILE="$HOME/.cloudflared/${TUNNEL_ID}.json"
-if [ ! -f "$CRED_FILE" ]; then
-  fail "Tunnel credentials not found at $CRED_FILE"
-fi
+  if [ -z "$TUNNEL_ID" ]; then
+    fail "Failed to resolve tunnel ID"
+  fi
 
-log "Configuring Cloudflare tunnel"
-cat > "$ROOT_DIR/cloudflared/config.yml" <<CFG
+  CRED_FILE="$HOME/.cloudflared/${TUNNEL_ID}.json"
+  if [ ! -f "$CRED_FILE" ]; then
+    fail "Tunnel credentials not found at $CRED_FILE"
+  fi
+
+  log "Configuring Cloudflare tunnel"
+  mkdir -p "$ROOT_DIR/cloudflared"
+  cat > "$ROOT_DIR/cloudflared/config.yml" <<CFG
 # Auto-generated by setup.sh
 
 tunnel: $TUNNEL_ID
@@ -125,32 +214,79 @@ ingress:
   - service: http_status:404
 CFG
 
-cloudflared tunnel route dns "$TUNNEL_NAME" "$HOSTNAME" >/dev/null || true
+  cloudflared tunnel route dns "$TUNNEL_NAME" "$HOSTNAME" >/dev/null || true
+  PUBLIC_HOST="$HOSTNAME"
 
-if [ ! -f "$ROOT_DIR/.env" ]; then
-  log "Creating .env"
-  cat > "$ROOT_DIR/.env" <<ENV
-PUBLIC_URL=https://$HOSTNAME
-PORT=$PORT
-SMARTTHINGS_WEBHOOK_PATH=/smartthings
-MCP_HTTP_PATH=/mcp
-SMARTTHINGS_CLIENT_ID=
-SMARTTHINGS_CLIENT_SECRET=
-SMARTTHINGS_OAUTH_TOKEN_URL=https://api.smartthings.com/oauth/token
-SMARTTHINGS_OAUTH_AUTHORIZE_URL=https://api.smartthings.com/oauth/authorize
-SMARTTHINGS_API_BASE_URL=https://api.smartthings.com/v1
-SMARTTHINGS_VERIFY_SIGNATURES=true
-SIGNATURE_TOLERANCE_SEC=300
-ALLOWED_MCP_HOSTS=localhost,127.0.0.1,$HOSTNAME
-TOKEN_STORE_PATH=$ROOT_DIR/data/token-store.json
-OAUTH_SCOPES=r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*
-OAUTH_REDIRECT_PATH=/oauth/callback
-LOG_LEVEL=info
-ENV
+elif [ "$TUNNEL_PROVIDER" = "ngrok" ]; then
+  require_cmd ngrok
+  NGROK_BIN=$(command -v ngrok)
+
+  NGROK_DOMAIN=${NGROK_DOMAIN:-}
+  if [ -z "$NGROK_DOMAIN" ]; then
+    read -rp "ngrok static domain (e.g. my-app.ngrok-free.app): " NGROK_DOMAIN
+  fi
+
+  NGROK_DOMAIN=$(normalize_host "$NGROK_DOMAIN")
+  if [ -z "$NGROK_DOMAIN" ]; then
+    fail "NGROK_DOMAIN is required"
+  fi
+
+  NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+  if [ -z "$NGROK_AUTHTOKEN" ]; then
+    read -rp "ngrok authtoken: " NGROK_AUTHTOKEN
+  fi
+
+  if [ -z "$NGROK_AUTHTOKEN" ]; then
+    fail "NGROK_AUTHTOKEN is required"
+  fi
+
+  log "Writing ngrok config"
+  mkdir -p "$ROOT_DIR/ngrok"
+  cat > "$ROOT_DIR/ngrok/ngrok.yml" <<CFG
+version: "3"
+agent:
+  authtoken: "$NGROK_AUTHTOKEN"
+endpoints:
+  - name: smartthings-mcp
+    url: https://$NGROK_DOMAIN
+    upstream:
+      url: http://localhost:$PORT
+CFG
+
+  ngrok config check --config "$ROOT_DIR/ngrok/ngrok.yml" >/dev/null || fail "ngrok config check failed"
+  PUBLIC_HOST="$NGROK_DOMAIN"
+
+else
+  fail "Unknown tunnel provider: $TUNNEL_PROVIDER"
 fi
+
+PUBLIC_URL="https://$PUBLIC_HOST"
+
+ensure_env_file
+update_env PUBLIC_URL "$PUBLIC_URL"
+update_env PORT "$PORT"
+update_env ALLOWED_MCP_HOSTS "localhost,127.0.0.1,$PUBLIC_HOST"
+set_env_default SMARTTHINGS_WEBHOOK_PATH "/smartthings"
+set_env_default MCP_HTTP_PATH "/mcp"
+set_env_default SMARTTHINGS_OAUTH_TOKEN_URL "https://api.smartthings.com/oauth/token"
+set_env_default SMARTTHINGS_OAUTH_AUTHORIZE_URL "https://api.smartthings.com/oauth/authorize"
+set_env_default SMARTTHINGS_API_BASE_URL "https://api.smartthings.com/v1"
+set_env_default SMARTTHINGS_VERIFY_SIGNATURES "true"
+set_env_default SIGNATURE_TOLERANCE_SEC "300"
+set_env_default TOKEN_STORE_PATH "$ROOT_DIR/data/token-store.json"
+set_env_default OAUTH_SCOPES "r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*"
+set_env_default OAUTH_REDIRECT_PATH "/oauth/callback"
+set_env_default LOG_LEVEL "info"
 
 CLIENT_ID=${SMARTTHINGS_CLIENT_ID:-}
 CLIENT_SECRET=${SMARTTHINGS_CLIENT_SECRET:-}
+
+if [ -z "$CLIENT_ID" ]; then
+  CLIENT_ID=$(read_env_value SMARTTHINGS_CLIENT_ID || true)
+fi
+if [ -z "$CLIENT_SECRET" ]; then
+  CLIENT_SECRET=$(read_env_value SMARTTHINGS_CLIENT_SECRET || true)
+fi
 
 if [ -z "$CLIENT_ID" ]; then
   read -rp "SmartThings Client ID: " CLIENT_ID
@@ -163,8 +299,8 @@ if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
   fail "SmartThings Client ID/Secret required"
 fi
 
-sed -i "s|^SMARTTHINGS_CLIENT_ID=.*|SMARTTHINGS_CLIENT_ID=$CLIENT_ID|" "$ROOT_DIR/.env"
-sed -i "s|^SMARTTHINGS_CLIENT_SECRET=.*|SMARTTHINGS_CLIENT_SECRET=$CLIENT_SECRET|" "$ROOT_DIR/.env"
+update_env SMARTTHINGS_CLIENT_ID "$CLIENT_ID"
+update_env SMARTTHINGS_CLIENT_SECRET "$CLIENT_SECRET"
 
 log "Installing dependencies"
 cd "$ROOT_DIR"
@@ -173,23 +309,8 @@ npm run build
 
 log "Writing systemd services"
 APP_SERVICE=/etc/systemd/system/smartthings-mcp.service
-TUNNEL_SERVICE=/etc/systemd/system/cloudflared-smartthings-mcp.service
-
-sudo tee "$TUNNEL_SERVICE" >/dev/null <<SERVICE
-[Unit]
-Description=Cloudflare Tunnel for SmartThings MCP
-After=network.target
-
-[Service]
-Type=simple
-User=$USER
-ExecStart=$CLOUDFLARED_BIN --config $ROOT_DIR/cloudflared/config.yml tunnel run
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
+CLOUDFLARE_SERVICE=/etc/systemd/system/cloudflared-smartthings-mcp.service
+NGROK_SERVICE=/etc/systemd/system/ngrok-smartthings-mcp.service
 
 sudo tee "$APP_SERVICE" >/dev/null <<SERVICE
 [Unit]
@@ -209,10 +330,52 @@ RestartSec=2
 WantedBy=multi-user.target
 SERVICE
 
+if [ "$TUNNEL_PROVIDER" = "cloudflare" ]; then
+  sudo tee "$CLOUDFLARE_SERVICE" >/dev/null <<SERVICE
+[Unit]
+Description=Cloudflare Tunnel for SmartThings MCP
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+ExecStart=$CLOUDFLARED_BIN --config $ROOT_DIR/cloudflared/config.yml tunnel run
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+elif [ "$TUNNEL_PROVIDER" = "ngrok" ]; then
+  sudo tee "$NGROK_SERVICE" >/dev/null <<SERVICE
+[Unit]
+Description=ngrok Tunnel for SmartThings MCP
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$ROOT_DIR
+ExecStart=$NGROK_BIN start smartthings-mcp --config $ROOT_DIR/ngrok/ngrok.yml
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+fi
+
 sudo systemctl daemon-reload
-sudo systemctl enable --now cloudflared-smartthings-mcp.service
+if [ "$TUNNEL_PROVIDER" = "cloudflare" ]; then
+  sudo systemctl disable --now ngrok-smartthings-mcp.service >/dev/null 2>&1 || true
+  sudo systemctl enable --now cloudflared-smartthings-mcp.service
+elif [ "$TUNNEL_PROVIDER" = "ngrok" ]; then
+  sudo systemctl disable --now cloudflared-smartthings-mcp.service >/dev/null 2>&1 || true
+  sudo systemctl enable --now ngrok-smartthings-mcp.service
+fi
 sudo systemctl enable --now smartthings-mcp.service
+sudo systemctl restart smartthings-mcp.service
 
 log "Setup complete"
-log "Next: open .env and set SMARTTHINGS_CLIENT_ID/SMARTTHINGS_CLIENT_SECRET"
-log "Then restart: sudo systemctl restart smartthings-mcp.service"
+log "Authorize once: $PUBLIC_URL/oauth/start"

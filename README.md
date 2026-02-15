@@ -70,7 +70,9 @@ Status endpoint: `GET /healthz`
   "time": "2026-02-15T12:34:56.789Z",
   "uptimeSec": 12345,
   "mode": "operational",
-  "quip": "All systems go. No goats were harmed."
+  "e2e": { "status": "pass", "checkedAt": "2026-02-15T12:34:50.000Z" },
+  "go": true,
+  "quip": "Green across the board."
 }
 ```
 If your server doesn’t answer like that, it’s having a day.

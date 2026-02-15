@@ -5,7 +5,7 @@ This project targets WSL2 with systemd enabled. A single command performs the fu
 ## Prerequisites
 - WSL2 with systemd enabled
 - Node.js (LTS)
-- SmartThings CLI (for app registration)
+- SmartThings CLI (optional for app registration)
 - Cloudflare account and domain (for durable URL)
 
 ## WSL2 Systemd Check
@@ -31,11 +31,16 @@ The setup script will:
 Service unit templates are available in `systemd/` for reference.
 
 ## After Setup
-Open `.env` and set:
+During setup you will be prompted for:
 - `SMARTTHINGS_CLIENT_ID`
 - `SMARTTHINGS_CLIENT_SECRET`
 
-Then restart the service:
+Create an OAuth-In SmartApp in SmartThings Developer Workspace and copy the client ID/secret. Set the SmartApp target URL to:
+```
+https://your-domain.example/smartthings
+```
+
+If you update `.env` later, restart the service:
 ```
 sudo systemctl restart smartthings-mcp.service
 ```

@@ -13,6 +13,7 @@ An MCP server for SmartThings with OAuth 2.0 Authorization Code flow, durable HT
 ```
 ./scripts/setup.sh
 ```
+You will be prompted for your SmartThings OAuth client ID and client secret.
 
 ## Status
 - Core server scaffolding and security docs complete.

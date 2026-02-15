@@ -41,13 +41,16 @@ MSG
 require_cmd node
 require_cmd npm
 require_cmd cloudflared
-require_cmd smartthings
 require_cmd python3
 
 require_wsl_systemd
 
 NODE_BIN=$(command -v node)
 CLOUDFLARED_BIN=$(command -v cloudflared)
+
+if ! command -v smartthings >/dev/null 2>&1; then
+  log "SmartThings CLI not found. You can create the OAuth app in Developer Workspace."
+fi
 
 log "Checking Cloudflare login"
 if [ ! -f "$HOME/.cloudflared/cert.pem" ]; then
@@ -143,9 +146,22 @@ LOG_LEVEL=info
 ENV
 fi
 
-if ! grep -q "SMARTTHINGS_CLIENT_ID" "$ROOT_DIR/.env"; then
-  fail ".env missing SMARTTHINGS_CLIENT_ID"
+CLIENT_ID=${SMARTTHINGS_CLIENT_ID:-}
+CLIENT_SECRET=${SMARTTHINGS_CLIENT_SECRET:-}
+
+if [ -z "$CLIENT_ID" ]; then
+  read -rp "SmartThings Client ID: " CLIENT_ID
 fi
+if [ -z "$CLIENT_SECRET" ]; then
+  read -rp "SmartThings Client Secret: " CLIENT_SECRET
+fi
+
+if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ]; then
+  fail "SmartThings Client ID/Secret required"
+fi
+
+sed -i "s|^SMARTTHINGS_CLIENT_ID=.*|SMARTTHINGS_CLIENT_ID=$CLIENT_ID|" "$ROOT_DIR/.env"
+sed -i "s|^SMARTTHINGS_CLIENT_SECRET=.*|SMARTTHINGS_CLIENT_SECRET=$CLIENT_SECRET|" "$ROOT_DIR/.env"
 
 log "Installing dependencies"
 cd "$ROOT_DIR"

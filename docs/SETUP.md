@@ -42,6 +42,9 @@ You can also preseed via env vars:
 - `NGROK_DOMAIN=my-app.ngrok-free.app` (ngrok)
 - `NGROK_AUTHTOKEN=...` (ngrok)
 
+To force re-entering SmartThings credentials on re-run:
+- `FORCE_REENTER_CREDS=true ./scripts/setup.sh`
+
 ## After Setup
 During setup you will be prompted for:
 - `SMARTTHINGS_CLIENT_ID`

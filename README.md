@@ -10,6 +10,7 @@ And now for something completely automated.
 - SmartApp lifecycle handling with webhook signature verification.
 - Comprehensive MCP tool surface: devices, status, commands, scenes, rules.
 - Hardened by default: minimal scopes, strict validation, no token leakage.
+ - Status endpoint that is crisp, candid, and mildly amused.
 
 ## Quickstart (WSL2)
 1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
@@ -39,8 +40,19 @@ Optional (for testing in the SmartThings app):
 See `SKILL.md` for the MCP usage skill and operational best practices.
 
 ## Status
-- Core server scaffolding and security docs complete.
-- One-command WSL2 setup script included.
+Status endpoint: `GET /healthz`
+```
+{
+  "ok": true,
+  "service": "smartthings-mcp",
+  "version": "0.1.0",
+  "time": "2026-02-15T12:34:56.789Z",
+  "uptimeSec": 12345,
+  "mode": "operational",
+  "quip": "All systems go. No goats were harmed."
+}
+```
+If your server doesn’t answer like that, it’s having a day.
 
 ## Architecture (High Level)
 ```

@@ -2,6 +2,8 @@
 
 An MCP server for SmartThings with OAuth2 tokens, durable HTTPS, and a security-first architecture. Designed to be dead simple in WSL2 while still feeling dependable. Built by a human + AI collaboration (OK human thought, AI coded).
 
+And now for something completely automated.
+
 ## Highlights
 - OAuth2 token handling (access + refresh) with automatic refresh.
 - Durable public URL via Cloudflare Tunnel, auto-starting on reboot.
@@ -10,28 +12,31 @@ An MCP server for SmartThings with OAuth2 tokens, durable HTTPS, and a security-
 - Hardened by default: minimal scopes, strict validation, no token leakage.
 
 ## Quickstart (WSL2)
-```
-./scripts/setup.sh
-```
-You will be prompted for your SmartThings OAuth client ID and client secret. After setup, visit `https://<your-domain>/oauth/start` once to authorize.
+1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
+2. Clone + enter repo: `git clone https://github.com/masltov-creations/smartthings-mcp && cd smartthings-mcp`
+3. Run setup: `./scripts/setup.sh`
+4. Authorize once: open `https://<your-domain>/oauth/start`
+
+Windows host option: `winget install Git.Git`
+Setup script runs `npm install` for you.
 
 ## SmartThings OAuth: 6-Step Checklist
-1. Install the SmartThings CLI.  
-   Link: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)
-2. Log in via CLI: `smartthings login`
-3. Create an OAuth-In SmartApp record.  
-   Link: [OAuth integrations](https://developer.smartthings.com/docs/connected-services/oauth-integrations/)
-4. Use these exact choices when prompted:
-   - App type: `OAuth-In App`
-   - Target URL: `https://<your-domain>/smartthings`
-   - Redirect URI: `https://<your-domain>/oauth/callback`
-   - Scopes: `r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*`
-5. Paste the CLI output `client_id` + `client_secret` when `./scripts/setup.sh` prompts you.
-6. Open `https://<your-domain>/oauth/start`, sign in, and approve access. Tokens are stored automatically.
+1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)
+2. Log in: `smartthings login`
+3. Create an OAuth-In SmartApp: [OAuth integrations](https://developer.smartthings.com/docs/connected-services/oauth-integrations/)
+4. Use these exact values:
+Target URL: `https://<your-domain>/smartthings`
+Redirect URI: `https://<your-domain>/oauth/callback`
+Scopes: `r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*`
+5. Paste `client_id` + `client_secret` when `./scripts/setup.sh` prompts you.
+6. Open `https://<your-domain>/oauth/start`, sign in, and approve access.
 
 Optional (for testing in the SmartThings app):
 - Enable Developer Mode: [SmartThings app developer mode](https://developer.smartthings.com/docs/devices/enable-developer-mode/)
 - Test your connected service: [Test your connected service](https://developer.smartthings.com/docs/connected-services/test-your-connected-service/)
+
+## MCP Skill
+See `SKILL.md` for the MCP usage skill and operational best practices.
 
 ## Status
 - Core server scaffolding and security docs complete.
@@ -64,6 +69,7 @@ Public HTTPS:
 This project is designed to run under WSL2 with systemd enabled. The setup script detects WSL2 and validates systemd before installing services.
 
 ## Repository Layout (planned)
+- `SKILL.md` - MCP usage skill and best practices
 - `docs/PLAN.md` - detailed implementation plan
 - `docs/ARCHITECTURE.md` - system design and data flow
 - `docs/THREAT_MODEL.md` - high-level threat model

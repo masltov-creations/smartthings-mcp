@@ -1,0 +1,34 @@
+# Node
+node_modules/
+dist/
+coverage/
+*.log
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+secrets/
+
+# Token storage / runtime data
+data/
+*.sqlite
+*.db
+*.db-journal
+token-store.json
+tokens.json
+refresh-tokens.json
+
+# Cloudflare Tunnel
+.cloudflare/
+cloudflared/
+**/cloudflared/*.json
+**/.cloudflared/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

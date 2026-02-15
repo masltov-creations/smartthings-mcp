@@ -49,6 +49,10 @@ The setup script will prompt for a tunnel provider:
 - `cloudflare` (recommended)
 - `ngrok` (static domain + authtoken required)
 
+If you choose `ngrok`, get these values first:
+- Static domain (`NGROK_DOMAIN`): https://dashboard.ngrok.com/domains
+- Authtoken (`NGROK_AUTHTOKEN`): https://dashboard.ngrok.com/get-started/your-authtoken
+
 You can also preseed via env vars:
 - `TUNNEL_PROVIDER=cloudflare|ngrok`
 - `HOSTNAME=st-mcp.example.com` (Cloudflare)

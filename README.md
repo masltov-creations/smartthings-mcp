@@ -25,7 +25,7 @@ Windows host option: `winget install Git.Git`
 Setup script runs `npm install` for you.
 No domain yet? See `docs/SETUP.md` for Quick Tunnel instructions (temporary only).
 Setup will prompt for Cloudflare or ngrok.
-If you choose ngrok, have a static domain and authtoken ready.
+If you choose ngrok, get your static domain at https://dashboard.ngrok.com/domains and your authtoken at https://dashboard.ngrok.com/get-started/your-authtoken.
 
 ## SmartThings OAuth: 6-Step Checklist
 1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)

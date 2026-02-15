@@ -277,6 +277,7 @@ set_env_default TOKEN_STORE_PATH "$ROOT_DIR/data/token-store.json"
 set_env_default OAUTH_SCOPES "r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*"
 set_env_default OAUTH_REDIRECT_PATH "/oauth/callback"
 set_env_default LOG_LEVEL "info"
+set_env_default LOG_FILE "$ROOT_DIR/data/smartthings-mcp.log"
 
 CLIENT_ID=${SMARTTHINGS_CLIENT_ID:-}
 CLIENT_SECRET=${SMARTTHINGS_CLIENT_SECRET:-}

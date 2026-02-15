@@ -31,6 +31,17 @@ The setup script will:
 
 Service unit templates are available in `systemd/` for reference.
 
+### Tunnel Provider Prompt
+The setup script will prompt for a tunnel provider:
+- `cloudflare` (recommended)
+- `ngrok` (static domain + authtoken required)
+
+You can also preseed via env vars:
+- `TUNNEL_PROVIDER=cloudflare|ngrok`
+- `HOSTNAME=st-mcp.example.com` (Cloudflare)
+- `NGROK_DOMAIN=my-app.ngrok-free.app` (ngrok)
+- `NGROK_AUTHTOKEN=...` (ngrok)
+
 ## After Setup
 During setup you will be prompted for:
 - `SMARTTHINGS_CLIENT_ID`

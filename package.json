@@ -1,0 +1,33 @@
+{
+  "name": "smartthings-mcp",
+  "version": "0.1.0",
+  "description": "OAuth2-enabled MCP server for SmartThings",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts",
+    "lint": "echo \"(lint placeholder)\"",
+    "setup": "bash scripts/setup.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0",
+    "pino": "^9.3.2",
+    "pino-http": "^9.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.30",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

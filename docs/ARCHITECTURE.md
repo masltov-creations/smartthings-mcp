@@ -6,6 +6,7 @@
 - **OAuth Handler**: Exchanges codes for tokens and refreshes them on schedule.
 - **Token Store**: Local storage with strict permissions.
 - **Tunnel**: Cloudflare Tunnel provides a stable HTTPS URL.
+ - **Request Verification**: SmartApp webhooks are verified via HTTP Signatures.
 
 ## Data Flow
 1. User installs SmartApp -> SmartThings calls `/smartthings` lifecycle.
@@ -18,8 +19,8 @@
 - Public HTTPS endpoint terminates at Cloudflare and is forwarded to local WSL2 service.
 - OAuth tokens never leave the host except to SmartThings API endpoints.
 - MCP server validates input and enforces scope checks before API calls.
+ - MCP endpoint enforces host allowlist to mitigate DNS rebinding.
 
 ## Reliability
 - Systemd auto-restarts for MCP server and tunnel.
 - Health endpoint for liveness probes.
-

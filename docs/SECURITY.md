@@ -8,6 +8,7 @@ This MCP server is a single-tenant, self-hosted integration that authenticates t
 - Minimize SmartThings scopes and reduce blast radius.
 - Prevent token leakage in logs and telemetry.
 - Restrict outbound requests to SmartThings endpoints.
+- Verify SmartApp webhook signatures (HTTP Signatures).
 
 ## Operational Guidelines
 - Keep secrets in `.env` and never commit them.
@@ -23,4 +24,3 @@ This MCP server is a single-tenant, self-hosted integration that authenticates t
 
 ## Reporting
 If you discover a vulnerability, open a private security advisory or contact the repository owner.
-

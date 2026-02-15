@@ -1,6 +1,6 @@
 # SmartThings MCP (OAuth2-Enabled)
 
-A production-grade MCP server for SmartThings with OAuth 2.0 Authorization Code flow, durable HTTPS endpoint, and a security-first architecture. Designed to be dead simple to deploy in WSL2 while remaining robust enough for real-world use.
+An MCP server for SmartThings with OAuth 2.0 Authorization Code flow, durable HTTPS endpoint, and a security-first architecture. Designed to be dead simple to deploy in WSL2 while remaining robust enough for real-world use.
 
 ## Highlights
 - OAuth 2.0 Authorization Code flow with strict redirect URI matching and CSRF protection.
@@ -9,9 +9,14 @@ A production-grade MCP server for SmartThings with OAuth 2.0 Authorization Code 
 - Comprehensive MCP tool surface: devices, status, commands, scenes, rules.
 - Hardened by default: minimal scopes, strict validation, no token leakage.
 
+## Quickstart (WSL2)
+```
+./scripts/setup.sh
+```
+
 ## Status
-- Plan and design complete.
-- Implementation is in progress.
+- Core server scaffolding and security docs complete.
+- One-command WSL2 setup script included.
 
 ## Architecture (High Level)
 ```
@@ -37,7 +42,7 @@ Public HTTPS:
 - Simplicity: one-command setup and single process server.
 
 ## WSL2 Support
-This project is designed to run under WSL2 with systemd enabled. The setup script will detect WSL2 and validate systemd before installing services.
+This project is designed to run under WSL2 with systemd enabled. The setup script detects WSL2 and validates systemd before installing services.
 
 ## Repository Layout (planned)
 - `docs/PLAN.md` - detailed implementation plan
@@ -46,7 +51,7 @@ This project is designed to run under WSL2 with systemd enabled. The setup scrip
 - `docs/SECURITY.md` - security model and operational guidance
 - `docs/SETUP.md` - installation instructions (one-command)
 - `docs/REDACTION.md` - safe-sharing checklist
-- `scripts/setup.sh` - one-command setup (planned)
+- `scripts/setup.sh` - one-command setup
 - `src/` - server and OAuth implementation
 
 ## Contributing

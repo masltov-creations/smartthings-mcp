@@ -1,6 +1,6 @@
 # Setup (WSL2 First)
 
-This project targets WSL2 with systemd enabled. A single command will eventually perform the full setup: tunnel, SmartThings OAuth app, services, and configuration.
+This project targets WSL2 with systemd enabled. A single command performs the full setup: tunnel, services, and configuration.
 
 ## Prerequisites
 - WSL2 with systemd enabled
@@ -16,7 +16,7 @@ systemd=true
 ```
 Then restart WSL.
 
-## Planned One-Command Setup
+## One-Command Setup
 ```
 ./scripts/setup.sh
 ```
@@ -26,6 +26,16 @@ The setup script will:
 - Create DNS for a stable hostname
 - Generate config and systemd unit files
 - Create `.env` and `.env.example`
-- Register the SmartThings OAuth app or prompt for credentials
 - Enable and start services
 
+Service unit templates are available in `systemd/` for reference.
+
+## After Setup
+Open `.env` and set:
+- `SMARTTHINGS_CLIENT_ID`
+- `SMARTTHINGS_CLIENT_SECRET`
+
+Then restart the service:
+```
+sudo systemctl restart smartthings-mcp.service
+```

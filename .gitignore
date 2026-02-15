@@ -24,6 +24,7 @@ refresh-tokens.json
 cloudflared/
 **/cloudflared/*.json
 **/.cloudflared/
+cloudflared/config.yml
 
 # OS
 .DS_Store

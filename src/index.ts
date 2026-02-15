@@ -58,7 +58,15 @@ function isOriginAllowed(originHeader?: string): boolean {
 }
 
 app.get("/healthz", async (_req, res) => {
-  res.status(200).json({ ok: true });
+  res.status(200).json({
+    ok: true,
+    service: "smartthings-mcp",
+    version: "0.1.0",
+    time: new Date().toISOString(),
+    uptimeSec: Math.floor(process.uptime()),
+    mode: "operational",
+    quip: "All systems go. No goats were harmed."
+  });
 });
 
 app.post(config.webhookPath, smartAppHandler);

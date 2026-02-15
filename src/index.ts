@@ -8,6 +8,7 @@ import { TokenStore } from "./tokenStore.js";
 import { createSmartAppHandler } from "./smartapp.js";
 import { SmartThingsClient } from "./smartthingsApi.js";
 import { createMcpServer } from "./mcp.js";
+import { buildAuthorizeUrl, handleOAuthCallback } from "./oauth.js";
 
 const app = express();
 app.set("trust proxy", true);
@@ -51,6 +52,28 @@ app.get("/healthz", async (_req, res) => {
 });
 
 app.post(config.webhookPath, smartAppHandler);
+
+app.get("/oauth/start", (_req, res) => {
+  const url = buildAuthorizeUrl();
+  res.redirect(url);
+});
+
+app.get(config.oauthRedirectPath, async (req, res) => {
+  const code = typeof req.query.code === "string" ? req.query.code : "";
+  const state = typeof req.query.state === "string" ? req.query.state : undefined;
+
+  if (!code) {
+    return res.status(400).json({ error: "Missing code" });
+  }
+
+  try {
+    await handleOAuthCallback(store, code, state);
+    return res.status(200).send("OAuth complete. Tokens stored.");
+  } catch (err) {
+    logger.error({ err }, "OAuth callback error");
+    return res.status(400).json({ error: "OAuth callback failed" });
+  }
+});
 
 (async () => {
   const { transport } = await createMcpServer(client);

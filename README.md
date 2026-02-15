@@ -15,8 +15,9 @@ And now for something completely automated.
 ## Quickstart (WSL2)
 1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
 2. Clone + enter repo: `git clone https://github.com/masltov-creations/smartthings-mcp && cd smartthings-mcp`
-3. Run setup: `./scripts/setup.sh`
-4. Authorize once: open `https://<your-domain>/oauth/start`
+3. Install `cloudflared` in WSL2 (see `docs/SETUP.md` for the step-by-step).
+4. Run setup: `./scripts/setup.sh`
+5. Authorize once: open `https://<your-domain>/oauth/start`
 
 Windows host option: `winget install Git.Git`
 Setup script runs `npm install` for you.

@@ -85,3 +85,28 @@ systemctl status cloudflared
    Reference: [Run cloudflared as a service](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/local-management/as-a-service/linux/)
 
 Note: the setup script automates these steps and writes `cloudflared/config.yml` for you.
+
+## No Domain Yet? Two Paths
+If you do not have a domain on Cloudflare, choose one of the paths below.
+
+### Path A: Get a Domain (Durable, Recommended)
+This is the correct long-term setup for SmartThings. You need a stable HTTPS hostname for the SmartApp target URL.
+
+1. Buy or use any domain (from any registrar).
+2. Add the domain to Cloudflare and point your nameservers to Cloudflare.  
+   Reference: [Add a site to Cloudflare](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/) citeturn1search9
+3. Continue with the “Cloudflare Tunnel (Manual, Step-by-Step)” section above.
+
+### Path B: Quick Tunnel (Temporary Testing Only)
+Quick Tunnels create a random `trycloudflare.com` URL. It changes each time and is not durable. Good for demos, not for a stable SmartThings integration. citeturn0search1
+
+1. Make sure you do **not** have `~/.cloudflared/config.yml` present. Quick Tunnels are not supported when a config file exists.  
+   Reference: [Quick Tunnels limitations](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/) citeturn0search1
+2. Run:
+```
+cloudflared tunnel --url http://localhost:8080
+```
+3. Copy the generated `https://<random>.trycloudflare.com` URL.
+4. Use that URL as `PUBLIC_URL` (only for temporary testing).
+
+Limitations: Quick Tunnels have request limits and do not support SSE. citeturn0search1

@@ -140,10 +140,11 @@ class Gateway {
   }
 
   async init() {
-    await this.reloadUpstreams(true);
+    // Load config first; defer upstream connections until after HTTP server starts listening.
+    await this.reloadUpstreams(true, false);
     if (config.upstreamsRefreshIntervalSec > 0) {
       this.refreshTimer = setInterval(() => {
-        this.reloadUpstreams(false).catch((err) => {
+        this.reloadUpstreams(false, true).catch((err) => {
           logger.warn({ err }, "Gateway upstream refresh failed");
         });
       }, config.upstreamsRefreshIntervalSec * 1000);
@@ -161,6 +162,10 @@ class Gateway {
     return new StreamableHTTPServerTransport({
       sessionIdGenerator: () => crypto.randomUUID()
     });
+  }
+
+  async refreshNow(force = true) {
+    return await this.reloadUpstreams(force, true);
   }
 
   getStatus(): GatewayStatus {
@@ -305,7 +310,7 @@ class Gateway {
     }
     if (name === `${gatewayPrefix}.reload_upstreams`) {
       const force = !!args?.force;
-      const result = await this.reloadUpstreams(force);
+      const result = await this.reloadUpstreams(force, true);
       return toText(result);
     }
 
@@ -385,7 +390,7 @@ class Gateway {
     return await state.client.readResource({ uri: decoded.original });
   }
 
-  private async reloadUpstreams(force: boolean) {
+  private async reloadUpstreams(force: boolean, syncUpstreams: boolean) {
     if (this.refreshing) {
       return { ok: false, message: "Reload already in progress" };
     }
@@ -454,7 +459,9 @@ class Gateway {
         }
       }
 
-      await Promise.all([...this.upstreams.values()].map((state) => this.syncUpstream(state)));
+      if (syncUpstreams) {
+        await Promise.all([...this.upstreams.values()].map((state) => this.syncUpstream(state)));
+      }
 
       if (this.server.transport) {
         this.server.sendToolListChanged();
@@ -529,6 +536,7 @@ export async function createGateway() {
   await gateway.getServer().connect(transport);
   return {
     transport,
-    status: () => gateway.getStatus()
+    status: () => gateway.getStatus(),
+    reload: (force = true) => gateway.refreshNow(force)
   };
 }

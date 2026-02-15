@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 log() { printf "[setup] %s\n" "$*"; }
+warn() { printf "[setup] WARN: %s\n" "$*" >&2; }
 fail() { printf "[setup] ERROR: %s\n" "$*" >&2; exit 1; }
 
 is_wsl() {
@@ -222,6 +223,111 @@ NODE
   fi
   rm -f "$tools_output"
   return 0
+}
+
+wait_for_health() {
+  local url="$1"
+  local timeout_sec="$2"
+  local output_file="$3"
+
+  local start now
+  start=$(date +%s)
+  while true; do
+    if curl -fsS --max-time 5 "$url" >"$output_file" 2>/dev/null; then
+      return 0
+    fi
+    now=$(date +%s)
+    if [ $((now - start)) -ge "$timeout_sec" ]; then
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+json_query() {
+  local file="$1"
+  local expr="$2"
+  node - "$file" "$expr" <<'NODE'
+const fs = require("fs");
+const file = process.argv[2];
+const expr = process.argv[3];
+let data;
+try {
+  data = JSON.parse(fs.readFileSync(file, "utf8"));
+} catch {
+  process.exit(0);
+}
+
+const get = (obj, path) => {
+  return path.split(".").reduce((acc, key) => {
+    if (acc && Object.prototype.hasOwnProperty.call(acc, key)) return acc[key];
+    return undefined;
+  }, obj);
+};
+
+const value = get(data, expr);
+if (typeof value === "undefined" || value === null) process.exit(0);
+if (typeof value === "object") {
+  console.log(JSON.stringify(value));
+} else {
+  console.log(String(value));
+}
+NODE
+}
+
+report_health_summary() {
+  local health_file="$1"
+  local source_label="$2"
+
+  local ok go e2e_status e2e_message gateway_enabled
+  ok=$(json_query "$health_file" "ok" || true)
+  go=$(json_query "$health_file" "go" || true)
+  e2e_status=$(json_query "$health_file" "e2e.status" || true)
+  e2e_message=$(json_query "$health_file" "e2e.message" || true)
+  gateway_enabled=$(json_query "$health_file" "gateway.enabled" || true)
+
+  log "$source_label health: ok=${ok:-unknown} go=${go:-unknown} e2e=${e2e_status:-unknown}"
+  if [ -n "$e2e_message" ]; then
+    log "$source_label e2e detail: $e2e_message"
+  fi
+  if [ "$gateway_enabled" = "true" ]; then
+    local gateway_json
+    gateway_json=$(json_query "$health_file" "gateway.upstreams" || true)
+    if [ -n "$gateway_json" ]; then
+      log "$source_label gateway upstreams: $gateway_json"
+    fi
+  fi
+}
+
+wait_for_e2e_pass() {
+  local url="$1"
+  local timeout_sec="$2"
+  local output_file
+  output_file=$(mktemp)
+
+  local start now
+  start=$(date +%s)
+  while true; do
+    if curl -fsS --max-time 8 "$url?e2e=1" >"$output_file" 2>/dev/null; then
+      local status
+      status=$(json_query "$output_file" "e2e.status" || true)
+      if [ "$status" = "pass" ]; then
+        report_health_summary "$output_file" "Public"
+        rm -f "$output_file"
+        return 0
+      fi
+    fi
+
+    now=$(date +%s)
+    if [ $((now - start)) -ge "$timeout_sec" ]; then
+      local latest
+      latest=$(json_query "$output_file" "e2e.status" || true)
+      [ -n "$latest" ] && warn "Timed out waiting for e2e=pass (last status: $latest)"
+      rm -f "$output_file"
+      return 1
+    fi
+    sleep 3
+  done
 }
 
 if [ "${1:-}" = "upstreams" ] || [ "${1:-}" = "--upstreams" ]; then
@@ -670,6 +776,48 @@ if ! is_no "$CONFIGURE_MCPORTER_VALUE"; then
   fi
 else
   log "Skipping mcporter configuration"
+fi
+
+if command -v curl >/dev/null 2>&1; then
+  STARTUP_HEALTH_TIMEOUT_SEC=${STARTUP_HEALTH_TIMEOUT_SEC:-90}
+  OAUTH_E2E_TIMEOUT_SEC=${OAUTH_E2E_TIMEOUT_SEC:-240}
+
+  LOCAL_HEALTH_URL="http://localhost:$PORT/healthz"
+  PUBLIC_HEALTH_URL="$PUBLIC_URL/healthz"
+  LOCAL_HEALTH_FILE=$(mktemp)
+  PUBLIC_HEALTH_FILE=$(mktemp)
+
+  log "Waiting for local health endpoint ($LOCAL_HEALTH_URL)"
+  if wait_for_health "$LOCAL_HEALTH_URL" "$STARTUP_HEALTH_TIMEOUT_SEC" "$LOCAL_HEALTH_FILE"; then
+    report_health_summary "$LOCAL_HEALTH_FILE" "Local"
+  else
+    warn "Local health did not become ready within ${STARTUP_HEALTH_TIMEOUT_SEC}s"
+  fi
+
+  log "Waiting for public health endpoint ($PUBLIC_HEALTH_URL)"
+  if wait_for_health "$PUBLIC_HEALTH_URL" "$STARTUP_HEALTH_TIMEOUT_SEC" "$PUBLIC_HEALTH_FILE"; then
+    report_health_summary "$PUBLIC_HEALTH_FILE" "Public"
+  else
+    warn "Public health did not become ready within ${STARTUP_HEALTH_TIMEOUT_SEC}s"
+    warn "This can happen briefly while the tunnel warms up. Recheck in ~10-20 seconds."
+  fi
+
+  E2E_STATUS=$(json_query "$PUBLIC_HEALTH_FILE" "e2e.status" || true)
+  if [ "$E2E_STATUS" = "not_authorized" ] && [ -t 0 ]; then
+    COMPLETE_OAUTH_NOW=${COMPLETE_OAUTH_NOW:-}
+    if [ -z "$COMPLETE_OAUTH_NOW" ]; then
+      read -rp "OAuth not completed yet. Open $PUBLIC_URL/oauth/start now and verify e2e pass when done? [Y/n]: " COMPLETE_OAUTH_NOW
+    fi
+    COMPLETE_OAUTH_NOW=${COMPLETE_OAUTH_NOW:-y}
+    if ! is_no "$COMPLETE_OAUTH_NOW"; then
+      log "Waiting for OAuth completion (timeout ${OAUTH_E2E_TIMEOUT_SEC}s)"
+      wait_for_e2e_pass "$PUBLIC_HEALTH_URL" "$OAUTH_E2E_TIMEOUT_SEC" || true
+    fi
+  fi
+
+  rm -f "$LOCAL_HEALTH_FILE" "$PUBLIC_HEALTH_FILE"
+else
+  warn "curl not found; skipping startup health verification"
 fi
 
 log "Setup complete"

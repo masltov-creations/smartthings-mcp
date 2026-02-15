@@ -228,5 +228,10 @@ app.get(config.oauthRedirectPath, async (req, res) => {
 
   app.listen(config.port, () => {
     logger.info({ port: config.port }, "SmartThings MCP server listening");
+    if (gateway) {
+      gateway.reload(true).catch((err) => {
+        logger.warn({ err }, "Initial gateway upstream sync failed");
+      });
+    }
   });
 })();

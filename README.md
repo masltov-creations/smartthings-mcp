@@ -43,6 +43,23 @@ Optional (for testing in the SmartThings app):
 ## MCP Skill
 See `SKILL.md` for the MCP usage skill and operational best practices.
 
+## OpenClaw: Install the Skill
+OpenClaw skills are Markdown files with YAML frontmatter, loaded from these locations (in order): `<workspace>/skills`, `~/.openclaw/skills`, then bundled skills. You can also add extra skill folders via `skills.load.extraDirs` in `~/.openclaw/openclaw.json`.
+
+Option A (recommended for local use):
+```
+mkdir -p ~/.openclaw/skills/smartthings-mcp
+cp SKILL.md ~/.openclaw/skills/smartthings-mcp/SKILL.md
+```
+
+Option B (workspace skill):
+```
+mkdir -p <workspace>/skills/smartthings-mcp
+cp SKILL.md <workspace>/skills/smartthings-mcp/SKILL.md
+```
+
+Then start a new OpenClaw session so it picks up the new skill.
+
 ## Status
 Status endpoint: `GET /healthz`
 ```

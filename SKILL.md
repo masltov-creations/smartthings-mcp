@@ -1,4 +1,9 @@
-# SKILL: SmartThings MCP Operator
+---
+name: smartthings-mcp
+description: Operate the SmartThings MCP tools for devices, scenes, and rules.
+---
+
+# SmartThings MCP Operator
 
 **Purpose**
 Operate the SmartThings MCP server confidently: connect, verify access, and use device/scene/rule tools safely.
@@ -40,4 +45,3 @@ Operate the SmartThings MCP server confidently: connect, verify access, and use 
 - `403 Host not allowed`: add your hostname to `ALLOWED_MCP_HOSTS`.
 - `401` from SmartThings API: re-run OAuth at `/oauth/start`.
 - Missing devices: verify OAuth scopes and reinstall the SmartApp if needed.
-

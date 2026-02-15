@@ -1,6 +1,4 @@
-import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SmartThingsClient } from "./smartthingsApi.js";
 import {
   deviceIdSchema,
@@ -73,10 +71,5 @@ export async function createMcpServer(client: SmartThingsClient) {
     return toText(data ?? { ok: true });
   });
 
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID()
-  });
-  await server.connect(transport);
-
-  return { server, transport };
+  return { server };
 }

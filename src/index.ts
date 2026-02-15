@@ -2,6 +2,9 @@ import express from "express";
 import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import { URL } from "node:url";
+import crypto from "node:crypto";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { TokenStore } from "./tokenStore.js";
@@ -130,6 +133,88 @@ function isOriginAllowed(originHeader?: string): boolean {
   }
 }
 
+function getSessionIdFromHeaders(headers: express.Request["headers"]): string | undefined {
+  const raw = headers["mcp-session-id"];
+  if (Array.isArray(raw)) {
+    return raw[0];
+  }
+  return typeof raw === "string" && raw.length > 0 ? raw : undefined;
+}
+
+type TransportConnectable = {
+  connect: (transport: StreamableHTTPServerTransport) => Promise<void>;
+};
+
+function createStreamableEndpointHandler(server: TransportConnectable, label: string) {
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+  let activeTransport: StreamableHTTPServerTransport | null = null;
+
+  return async (req: express.Request, res: express.Response) => {
+    const sessionId = getSessionIdFromHeaders(req.headers);
+    let transport = sessionId ? transports.get(sessionId) : undefined;
+    const isInitRequest = req.method === "POST" && isInitializeRequest(req.body);
+
+    try {
+      if (!transport) {
+        if (sessionId || !isInitRequest) {
+          return res.status(400).json({
+            jsonrpc: "2.0",
+            error: {
+              code: -32000,
+              message: "Bad Request: No valid session ID provided"
+            },
+            id: null
+          });
+        }
+
+        if (activeTransport) {
+          try {
+            await activeTransport.close();
+          } catch (err) {
+            logger.warn({ err, label }, "Failed closing previous transport session");
+          } finally {
+            activeTransport = null;
+            transports.clear();
+          }
+        }
+
+        let initializedSessionId: string | undefined;
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => crypto.randomUUID(),
+          onsessioninitialized: (sid) => {
+            initializedSessionId = sid;
+            transports.set(sid, transport!);
+          }
+        });
+
+        transport.onclose = () => {
+          if (activeTransport === transport) {
+            activeTransport = null;
+          }
+          const sid = transport?.sessionId ?? initializedSessionId;
+          if (sid) {
+            transports.delete(sid);
+          }
+        };
+
+        await server.connect(transport);
+        activeTransport = transport;
+      }
+
+      if (req.method === "GET" || req.method === "DELETE") {
+        await transport.handleRequest(req, res);
+      } else {
+        await transport.handleRequest(req, res, req.body);
+      }
+    } catch (err) {
+      logger.error({ err, label, path: req.path, method: req.method, sessionId }, "Streamable endpoint error");
+      if (!res.headersSent) {
+        res.status(500).json({ error: `${label} error` });
+      }
+    }
+  };
+}
+
 app.get("/healthz", async (req, res) => {
   const runE2E =
     typeof req.query.e2e === "string" && ["1", "true", "yes"].includes(req.query.e2e.toLowerCase());
@@ -180,7 +265,7 @@ app.get(config.oauthRedirectPath, async (req, res) => {
     process.exit(1);
   }
 
-  const { transport } = await createMcpServer(client);
+  const { server: mcpServer } = await createMcpServer(client);
   let gateway: Awaited<ReturnType<typeof createGateway>> | null = null;
   if (config.gatewayEnabled) {
     try {
@@ -194,6 +279,7 @@ app.get(config.oauthRedirectPath, async (req, res) => {
     gatewayStatus = gateway.status;
   }
 
+  const handleMcpEndpoint = createStreamableEndpointHandler(mcpServer as unknown as TransportConnectable, "MCP");
   app.all(config.mcpPath, async (req, res) => {
     if (!isHostAllowed(req.headers.host)) {
       return res.status(403).json({ error: "Host not allowed" });
@@ -201,15 +287,11 @@ app.get(config.oauthRedirectPath, async (req, res) => {
     if (!isOriginAllowed(req.headers.origin as string | undefined)) {
       return res.status(403).json({ error: "Origin not allowed" });
     }
-    try {
-      await transport.handleRequest(req, res, req.body);
-    } catch (err) {
-      logger.error({ err }, "MCP transport error");
-      res.status(500).json({ error: "MCP error" });
-    }
+    await handleMcpEndpoint(req, res);
   });
 
   if (gateway) {
+    const handleGatewayEndpoint = createStreamableEndpointHandler(gateway.server, "Gateway");
     app.all(config.gatewayPath, async (req, res) => {
       if (!isHostAllowed(req.headers.host)) {
         return res.status(403).json({ error: "Host not allowed" });
@@ -217,12 +299,7 @@ app.get(config.oauthRedirectPath, async (req, res) => {
       if (!isOriginAllowed(req.headers.origin as string | undefined)) {
         return res.status(403).json({ error: "Origin not allowed" });
       }
-      try {
-        await gateway.transport.handleRequest(req, res, req.body);
-      } catch (err) {
-        logger.error({ err }, "Gateway transport error");
-        res.status(500).json({ error: "Gateway error" });
-      }
+      await handleGatewayEndpoint(req, res);
     });
   }
 

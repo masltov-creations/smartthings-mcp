@@ -117,3 +117,4 @@ Gateway mode adds a namespace prefix:
 - `401` from SmartThings API: re-run OAuth at `/oauth/start`.
 - Missing devices: verify OAuth scopes and reinstall the SmartApp if needed.
 - Gateway tool not found: use namespaced tools (`<upstream>.<tool>`) and ensure `config/upstreams.json` includes that upstream.
+- `SSE error: Non-200 status code (400)` on `mcporter call`: pull latest, rerun `./scripts/setup.sh` (it re-registers mcporter), and restart `smartthings-mcp.service`.

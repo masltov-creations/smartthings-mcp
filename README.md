@@ -21,6 +21,7 @@ And now for something completely automated.
 
 Windows host option: `winget install Git.Git`
 Setup script runs `npm install` for you.
+No domain yet? See `docs/SETUP.md` for Quick Tunnel instructions (temporary only).
 
 ## SmartThings OAuth: 6-Step Checklist
 1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)

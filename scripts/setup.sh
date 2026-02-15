@@ -137,11 +137,14 @@ MCP_HTTP_PATH=/mcp
 SMARTTHINGS_CLIENT_ID=
 SMARTTHINGS_CLIENT_SECRET=
 SMARTTHINGS_OAUTH_TOKEN_URL=https://api.smartthings.com/oauth/token
+SMARTTHINGS_OAUTH_AUTHORIZE_URL=https://api.smartthings.com/oauth/authorize
 SMARTTHINGS_API_BASE_URL=https://api.smartthings.com/v1
 SMARTTHINGS_VERIFY_SIGNATURES=true
 SIGNATURE_TOLERANCE_SEC=300
 ALLOWED_MCP_HOSTS=localhost,127.0.0.1,$HOSTNAME
 TOKEN_STORE_PATH=$ROOT_DIR/data/token-store.json
+OAUTH_SCOPES=r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*
+OAUTH_REDIRECT_PATH=/oauth/callback
 LOG_LEVEL=info
 ENV
 fi

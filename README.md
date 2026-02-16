@@ -185,10 +185,7 @@ Public HTTPS:
 - `src/` — server and OAuth implementation
 
 ## Contributing
-Contributions are welcome after initial publication focus areas land. High-value areas include:
-- Security review
-- SmartThings API/tool coverage
-- Reliability and observability improvements
+Contributions are welcome.
 
 ## License
 MIT

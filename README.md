@@ -1,6 +1,6 @@
 # SmartThings MCP
 
-An MCP server for SmartThings. Designed to deploy easilly in WSL2. Built by a human + AI collaboration (OK human thought, AI coded).
+An MCP server for SmartThings. Designed to deploy easilly in Windows or WSL2. Built by a human + AI collaboration (OK human thought, AI coded).
 
 And now for something completely automated.
 
@@ -17,7 +17,7 @@ And now for something completely automated.
 ## Quickstart (WSL2)
 1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
 2. Clone + enter repo: `git clone https://github.com/masltov-creations/smartthings-mcp && cd smartthings-mcp`
-3. Install your tunnel client (`cloudflared` or `ngrok`) in WSL2 (see `docs/SETUP.md`).
+3. Get your HTTPS tunnel ready (`cloudflared` or `ngrok`) in WSL2 (see `docs/SETUP.md`).
 4. Run setup: `./scripts/setup.sh`
 5. Authorize once: open `https://<your-domain>/oauth/start`
 
@@ -29,6 +29,7 @@ If you choose ngrok, get your static domain at https://dashboard.ngrok.com/domai
 Setup also waits for local/public health readiness and can verify OAuth e2e after you authorize.
 
 ## SmartThings OAuth: 6-Step Checklist
+These steps are required. These steps authorize an app to connect (on your behalf) to your SmartThings backend.
 1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)
 2. Log in: `smartthings login`
 3. Create an OAuth-In SmartApp: [OAuth integrations](https://developer.smartthings.com/docs/connected-services/oauth-integrations/)

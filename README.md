@@ -1,102 +1,132 @@
 # SmartThings MCP
 
-An MCP server for SmartThings. Designed to deploy easilly in Windows or WSL2. Built by a human + AI collaboration (OK human thought, AI coded).
+*And now for something completely automated.*
 
-And now for something completely automated.
+A small, sturdy MCP server that lets MCP-capable AI agents (including ChatGPT, Claude, OpenClaw, and friends) talk to your SmartThings home—without duct-taping API calls together in the dark.
 
-## Highlights
-- OAuth2 token handling (access + refresh) with automatic refresh.
-- Durable public URL via Cloudflare Tunnel, auto-starting on reboot.
-- SmartApp lifecycle handling with webhook signature verification.
-- Comprehensive MCP tool surface: devices, status, commands, scenes, rules.
-- Hardened by default: minimal scopes, strict validation, no token leakage.
-- Status endpoint that is crisp, candid, and mildly amused.
-- `mcporter`-direct workflow by default (lowest complexity).
-- Optional MCP gateway with named upstreams for multi-server setups.
+## What this thing is (and why it exists)
+SmartThings MCP is a bridge between:
+- **MCP clients** (ChatGPT, Claude, OpenClaw, other MCP-capable agents, and your own automations)
+- **Your SmartThings account**
+
+In plain English: it gives your assistant a safe, structured way to **see devices, read state, run commands, launch scenes, and work with rules**.
+
+It exists so you can stop manually poking dashboards and start saying things like:
+- “List all my locations.”
+- “Turn off the office lights.”
+- “Run Movie Night scene.”
+- “Show me device status that isn’t behaving.”
+
+All with one service endpoint and a minimum of ceremonial chanting.
+
+## How it works (the not-magic)
+1. You run this server (typically in **WSL2**).
+2. You expose it securely over HTTPS (usually via **Cloudflare Tunnel** or **ngrok**).
+3. You create a SmartThings OAuth SmartApp pointed at this server.
+4. You authorize once.
+5. The server stores and refreshes OAuth tokens automatically.
+6. MCP clients call the server’s tool endpoints; the server talks to SmartThings APIs on your behalf.
+
+That’s it. No hand-rolled token scripts. No “why did this expire at 2:14 AM?” surprises.
+
+## What you need before setup
+- **Node.js 18+**
+- **Git**
+- **WSL2 with systemd** (recommended path)
+- A public HTTPS hostname (Cloudflare Tunnel or ngrok)
+- A SmartThings developer setup so you can create an OAuth SmartApp
 
 ## Quickstart (WSL2)
-1. Install Git (WSL): `sudo apt-get update && sudo apt-get install -y git`
-2. Clone + enter repo: `git clone https://github.com/masltov-creations/smartthings-mcp && cd smartthings-mcp`
-3. Get your HTTPS tunnel ready (`cloudflared` or `ngrok`) in WSL2 (see `docs/SETUP.md`).
-4. Run setup: `./scripts/setup.sh`
-5. Authorize once: open `https://<your-domain>/oauth/start`
+1. Install Git:
+   ```bash
+   sudo apt-get update && sudo apt-get install -y git
+   ```
+2. Clone and enter the repo:
+   ```bash
+   git clone https://github.com/masltov-creations/smartthings-mcp
+   cd smartthings-mcp
+   ```
+3. Make sure your tunnel is ready (`cloudflared` or `ngrok`) — see `docs/SETUP.md`.
+4. Run setup:
+   ```bash
+   ./scripts/setup.sh
+   ```
+5. Authorize once in your browser:
+   ```text
+   https://<your-domain>/oauth/start
+   ```
 
-Windows host option: `winget install Git.Git`
-Setup script runs `npm install` for you.
-No domain yet? See `docs/SETUP.md` for Quick Tunnel instructions (temporary only).
-Setup will prompt for Cloudflare or ngrok.
-If you choose ngrok, get your static domain at https://dashboard.ngrok.com/domains and your authtoken at https://dashboard.ngrok.com/get-started/your-authtoken.
-Setup also waits for local/public health readiness and can verify OAuth e2e after you authorize.
-
-## How to get your SmartThings ClientID and Secret in 6 easy Steps
-Follow these steps get the ID and secret required to authorize the MCP app to connect (on your behalf) to your SmartThings backend.
-1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)
-2. Log in: `smartthings login`
-3. Create an OAuth-In SmartApp: [OAuth integrations](https://developer.smartthings.com/docs/connected-services/oauth-integrations/)
-4. Use these exact values:
-Target URL: `https://<your-domain>/smartthings`
-Redirect URI: `https://<your-domain>/oauth/callback`
-Scopes: `r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*`
-5. Paste `client_id` + `client_secret` when `./scripts/setup.sh` prompts you.
-6. Open `https://<your-domain>/oauth/start`, sign in, and approve access.
-
-Optional (for testing in the SmartThings app):
-- Enable Developer Mode: [SmartThings app developer mode](https://developer.smartthings.com/docs/devices/enable-developer-mode/)
-- Test your connected service: [Test your connected service](https://developer.smartthings.com/docs/connected-services/test-your-connected-service/)
-
-## MCP Skill
-See `SKILL.md` for the MCP usage skill and operational best practices.
-
-## OpenClaw: Install the Skill
-`./scripts/setup.sh` now offers to do this automatically:
-- installs `SKILL.md` to `~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md`
-- installs to global OpenClaw skills when `/usr/lib/node_modules/openclaw/skills` exists
-
-Manual fallback:
+Windows host option for Git:
 ```bash
-mkdir -p ~/.openclaw/workspace/skills/smartthings-mcp
-cp SKILL.md ~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md
+winget install Git.Git
 ```
 
-Then start a new OpenClaw session so it picks up the skill.
+If you do not yet have a domain, check `docs/SETUP.md` for temporary Quick Tunnel guidance.
 
-## OpenClaw + mcporter (Direct, Recommended)
-OpenClaw does not currently use an `mcpServers` block in `~/.openclaw/openclaw.json`. Use `mcporter` to call MCP servers directly.
+## SmartThings OAuth app setup (6 short steps)
+1. Install SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)
+2. Log in:
+   ```bash
+   smartthings login
+   ```
+3. Create an OAuth-In SmartApp: [OAuth integrations](https://developer.smartthings.com/docs/connected-services/oauth-integrations/)
+4. Use these values exactly:
+   - **Target URL:** `https://<your-domain>/smartthings`
+   - **Redirect URI:** `https://<your-domain>/oauth/callback`
+   - **Scopes:** `r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*`
+5. Paste the resulting `client_id` and `client_secret` when `./scripts/setup.sh` asks.
+6. Open `https://<your-domain>/oauth/start`, sign in, and approve access.
 
-### 1. Add the SmartThings MCP endpoint
-`./scripts/setup.sh` now offers to run this for you automatically:
+Optional for testing in the mobile app:
+- [Enable Developer Mode](https://developer.smartthings.com/docs/devices/enable-developer-mode/)
+- [Test your connected service](https://developer.smartthings.com/docs/connected-services/test-your-connected-service/)
+
+## What this enables you to do
+Once connected, your MCP client can:
+- Discover locations and devices
+- Read current device status/state
+- Send device commands
+- Run scenes
+- Read and manage rules
+
+In practical terms: your AI assistant can help you *operate* your home setup, not just discuss it politely.
+
+## MCP client integration (ChatGPT, Claude, OpenClaw, and others)
+This server works with any AI agent/client that supports MCP.
+
+For OpenClaw specifically, direct MCP endpoints via `mcporter` are currently the most reliable path.
+
+Add this server:
 ```bash
 npx -y mcporter config add smartthings https://<your-domain>/mcp --scope home
 ```
-It also offers a verification pass (`mcporter config get` + `mcporter list --schema`).
 
-Inspect available tools:
+Inspect tools:
 ```bash
 npx -y mcporter list smartthings --schema
 ```
 
-Call SmartThings tools:
+Call tools:
 ```bash
 npx -y mcporter call --server smartthings --tool list_locations
 npx -y mcporter call --server smartthings --tool list_devices
 ```
 
-### 2. Add more MCP servers directly (no gateway)
+`./scripts/setup.sh` can do most of this for you automatically, including optional verification.
+
+## Optional: install the SmartThings skill for OpenClaw
+Setup can install it automatically. Manual fallback:
+
 ```bash
-npx -y mcporter config add playwright https://mcp.example.com/mcp --scope home
-npx -y mcporter list playwright --schema
+mkdir -p ~/.openclaw/workspace/skills/smartthings-mcp
+cp SKILL.md ~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md
 ```
 
-If a server needs headers:
-```bash
-npx -y mcporter config add playwright https://mcp.example.com/mcp \
-  --header "Authorization=Bearer ${PLAYWRIGHT_MCP_TOKEN}" --scope home
-```
+Then start a new OpenClaw session.
 
-## Optional Gateway (Advanced, Multi-Client)
-Use the built-in gateway only if you need one shared MCP endpoint with named upstreams.
+## Optional gateway mode (advanced)
+If you want one shared endpoint with multiple named upstream MCP servers, enable gateway mode:
 
-Enable gateway mode:
 ```bash
 MCP_GATEWAY_ENABLED=true ./scripts/setup.sh
 ```
@@ -110,94 +140,55 @@ Manage upstreams:
 ./scripts/setup.sh upstreams
 ```
 
-Example `config/upstreams.json`:
-```json
-{
-  "upstreams": [
-    {
-      "name": "smartthings",
-      "url": "http://localhost:8080/mcp",
-      "description": "Local SmartThings MCP"
-    },
-    {
-      "name": "playwright",
-      "url": "https://mcp.example.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${PLAYWRIGHT_MCP_TOKEN}"
-      }
-    }
-  ]
-}
-```
+## Security + operational behavior
+- OAuth2 access + refresh tokens with automatic refresh
+- SmartApp webhook signature verification
+- Minimal scopes and strict validation
+- No secret leakage in normal logs
+- Health endpoint for quick readiness checks
 
-Call through gateway:
-```bash
-npx -y mcporter config add stproxy https://<your-domain>/mcp-gateway --scope home
-npx -y mcporter call --server stproxy --tool gateway.list_upstreams
-npx -y mcporter call --server stproxy --tool smartthings.list_locations
-```
+Health endpoint:
+- `GET /healthz`
 
-Operational notes:
-- Names must be unique and use `A-Z a-z 0-9 _ -` (no dots).
-- SmartThings MCP does not require auth headers by default.
-- Cleanup options: `./scripts/cleanup.sh --soft|--purge` or `./scripts/setup.sh cleanup ...`.
+If health is green, you’re in business. If not, the server will be candid about it (with just a hint of attitude).
 
-## Status
-Status endpoint: `GET /healthz`
-```
-{
-  "ok": true,
-  "service": "smartthings-mcp",
-  "version": "0.1.0",
-  "time": "2026-02-15T12:34:56.789Z",
-  "uptimeSec": 12345,
-  "mode": "operational",
-  "e2e": { "status": "pass", "checkedAt": "2026-02-15T12:34:50.000Z" },
-  "go": true,
-  "quip": "Green across the board."
-}
-```
-If your server doesn’t answer like that, it’s having a day.
-
-## Architecture (High Level)
-```
-+----------------------+       +---------------------------+
+## Architecture (high level)
+```text
++----------------------+       +----------------------------+
 |   MCP Clients        |  -->  |   MCP Server (Node.js)     |
-|  (LLM tools / apps)  |       |  - /smartthings webhook     |
-+----------------------+       |  - /oauth/start + callback  |
+| (LLM tools / apps)   |       |  - /smartthings webhook    |
++----------------------+       |  - /oauth/start + callback |
                                |  - MCP tools API           |
-                               +-------------+-------------+
+                               +-------------+--------------+
                                              |
                                              v
-                               +---------------------------+
+                               +----------------------------+
                                |   SmartThings REST APIs    |
-                               +---------------------------+
+                               +----------------------------+
 
 Public HTTPS:
   Cloudflare Tunnel -> HTTPS hostname -> local MCP server
 ```
 
-## Design Principles
-- Security by default: no secrets in git, strict OAuth2 validation, minimal scopes.
-- Robustness: automatic token refresh, resilient services, health checks.
-- Simplicity: one-command setup and single process server (with just enough fun).
+## Design principles
+- **Security by default**
+- **Reliable automation over heroic manual fixes**
+- **Simple setup with sensible defaults**
+- **Serious engineering, unserious tone (in moderation)**
 
-## WSL2 Support
-This project is designed to run under WSL2 with systemd enabled. The setup script detects WSL2 and validates systemd before installing services.
-
-## Repository Layout (planned)
-- `SKILL.md` - MCP usage skill and best practices
-- `docs/PLAN.md` - detailed implementation plan
-- `docs/ARCHITECTURE.md` - system design and data flow
-- `docs/THREAT_MODEL.md` - high-level threat model
-- `docs/SECURITY.md` - security model and operational guidance
-- `docs/SETUP.md` - installation instructions (one-command)
-- `docs/REDACTION.md` - safe-sharing checklist
-- `scripts/setup.sh` - one-command setup
-- `src/` - server and OAuth implementation
+## Repository layout
+- `SKILL.md` — MCP usage skill and operational best practices
+- `docs/SETUP.md` — installation instructions
+- `docs/ARCHITECTURE.md` — design and data flow
+- `docs/SECURITY.md` — security model and operational guidance
+- `scripts/setup.sh` — one-command setup
+- `src/` — server and OAuth implementation
 
 ## Contributing
-This repository will accept contributions once the initial implementation is published. Focus areas include security review, SmartThings API coverage, and MCP tool design.
+Contributions are welcome after initial publication focus areas land. High-value areas include:
+- Security review
+- SmartThings API/tool coverage
+- Reliability and observability improvements
 
 ## License
 MIT

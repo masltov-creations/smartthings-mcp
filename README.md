@@ -28,8 +28,8 @@ Setup will prompt for Cloudflare or ngrok.
 If you choose ngrok, get your static domain at https://dashboard.ngrok.com/domains and your authtoken at https://dashboard.ngrok.com/get-started/your-authtoken.
 Setup also waits for local/public health readiness and can verify OAuth e2e after you authorize.
 
-## SmartThings OAuth: 6-Step Checklist
-These steps are required. These steps authorize an app to connect (on your behalf) to your SmartThings backend.
+## How to get your SmartThings ClientID and Secret in 6 easy Steps
+Follow these steps get the ID and secret required to authorize the MCP app to connect (on your behalf) to your SmartThings backend.
 1. Install the SmartThings CLI: [SmartThings CLI docs](https://developer.smartthings.com/docs/sdks/cli/)
 2. Log in: `smartthings login`
 3. Create an OAuth-In SmartApp: [OAuth integrations](https://developer.smartthings.com/docs/connected-services/oauth-integrations/)

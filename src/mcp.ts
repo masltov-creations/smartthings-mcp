@@ -3,6 +3,7 @@ import { SmartThingsClient } from "./smartthingsApi.js";
 import {
   deviceIdSchema,
   listDevicesSchema,
+  roomTemperatureMapSchema,
   ruleSchema,
   sceneSchema,
   sendCommandSchema,
@@ -28,6 +29,15 @@ export async function createMcpServer(client: SmartThingsClient) {
 
   server.tool("list_devices", listDevicesSchema, async (input, _extra) => {
     const data = await client.listDevices(input.locationId, input.installedAppId);
+    return toText(data);
+  });
+
+  server.tool("list_devices_with_room_temperatures", roomTemperatureMapSchema, async (input, _extra) => {
+    const data = await client.listDevicesWithRoomTemperatures(
+      input.locationId,
+      input.installedAppId,
+      input.refresh ?? false
+    );
     return toText(data);
   });
 

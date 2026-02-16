@@ -37,7 +37,8 @@ BASE_URL="$(grep '^PUBLIC_URL=' .env | cut -d= -f2)"
 3. Confirm OAuth: visit `https://<your-domain>/oauth/start` once.
 4. Call `list_locations` to confirm access.
 5. Call `list_devices` to discover device IDs.
-6. Use `get_device_status` or `send_device_command`.
+6. For quick environment summaries, use `list_devices_with_room_temperatures` (single pass, faster than per-device status loops).
+7. Use `get_device_status` or `send_device_command` for device-level detail/actions.
 
 **OpenClaw + MCP Direct Workflow (Recommended)**
 OpenClaw does not use an `mcpServers` section in `~/.openclaw/openclaw.json`. Use `mcporter`:
@@ -94,6 +95,7 @@ curl -N \
 **Tool Map**
 - `list_locations`: verify OAuth and discover location IDs.
 - `list_devices`: list devices, optionally by location.
+- `list_devices_with_room_temperatures`: fast snapshot of each device with its room name and aggregated room temperature.
 - `get_device_details`: model, capabilities, and metadata for a device.
 - `get_device_status`: current state values for a device.
 - `send_device_command`: execute commands on a device.
@@ -102,6 +104,14 @@ curl -N \
 - `list_rules`: list automation rules.
 - `get_rule_details`: inspect a rule definition.
 - `update_rule`: update a rule definition.
+
+**Human-First Output Contract**
+- Lead with a one-line answer first (what the user asked for).
+- Prefer names over raw IDs (`label`/`name` first, ID in parentheses only when needed).
+- For room/device temperature requests, present rows in this order: `Device | Room | Temp (F/C) | Confidence/Notes`.
+- Show counts at top (`devices`, `rooms`, `missing readings`) so users can trust completeness quickly.
+- Put unknowns explicitly as `unknown` (not blank), and include the likely reason once.
+- When listing many items, sort by room then device and cap initial output to the most relevant rows; offer full dump on request.
 
 Gateway mode adds a namespace prefix:
 - `smartthings.list_locations`
@@ -116,5 +126,6 @@ Gateway mode adds a namespace prefix:
 - `403 Host not allowed`: add your hostname to `ALLOWED_MCP_HOSTS`.
 - `401` from SmartThings API: re-run OAuth at `/oauth/start`.
 - Missing devices: verify OAuth scopes and reinstall the SmartApp if needed.
+- Temperature-by-room requests are slow: call `list_devices_with_room_temperatures` instead of looping `get_device_status` over every device.
 - Gateway tool not found: use namespaced tools (`<upstream>.<tool>`) and ensure `config/upstreams.json` includes that upstream.
 - `SSE error: Non-200 status code (400)` on `mcporter call`: pull latest, rerun `./scripts/setup.sh` (it re-registers mcporter), and restart `smartthings-mcp.service`.

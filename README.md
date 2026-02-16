@@ -1,6 +1,6 @@
 # SmartThings MCP
 
-An MCP server for SmartThings with OAuth2 support, HTTPS, and a security-first architecture. Designed to be dead simple in WSL2 while still feeling dependable. Built by a human + AI collaboration (OK human thought, AI coded).
+An MCP server for SmartThings. Designed to be dead simple in WSL2 while still feeling dependable. Built by a human + AI collaboration (OK human thought, AI coded).
 
 And now for something completely automated.
 

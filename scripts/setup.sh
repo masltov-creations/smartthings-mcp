@@ -28,6 +28,19 @@ is_no() {
   esac
 }
 
+has_openclaw() {
+  if command -v openclaw >/dev/null 2>&1; then
+    return 0
+  fi
+  if [ -d "$HOME/.openclaw" ]; then
+    return 0
+  fi
+  if [ -d "/usr/lib/node_modules/openclaw" ]; then
+    return 0
+  fi
+  return 1
+}
+
 require_wsl_systemd() {
   if ! is_wsl; then
     log "WSL2 not detected. Proceeding anyway."
@@ -89,6 +102,9 @@ LOG_FILE=$ROOT_DIR/data/smartthings-mcp.log
 E2E_CHECK_ENABLED=true
 E2E_CHECK_INTERVAL_SEC=300
 E2E_CHECK_TIMEOUT_MS=5000
+SMARTTHINGS_REQUEST_TIMEOUT_MS=15000
+ROOM_TEMP_CACHE_TTL_SEC=20
+ROOM_TEMP_STATUS_CONCURRENCY=8
 MCP_GATEWAY_ENABLED=false
 UPSTREAMS_CONFIG_PATH=$ROOT_DIR/config/upstreams.json
 UPSTREAMS_REFRESH_INTERVAL_SEC=300
@@ -544,6 +560,9 @@ set_env_default LOG_FILE "$ROOT_DIR/data/smartthings-mcp.log"
 set_env_default E2E_CHECK_ENABLED "true"
 set_env_default E2E_CHECK_INTERVAL_SEC "300"
 set_env_default E2E_CHECK_TIMEOUT_MS "5000"
+set_env_default SMARTTHINGS_REQUEST_TIMEOUT_MS "15000"
+set_env_default ROOM_TEMP_CACHE_TTL_SEC "20"
+set_env_default ROOM_TEMP_STATUS_CONCURRENCY "8"
 set_env_default MCP_GATEWAY_ENABLED "false"
 set_env_default UPSTREAMS_CONFIG_PATH "$ROOT_DIR/config/upstreams.json"
 set_env_default UPSTREAMS_REFRESH_INTERVAL_SEC "300"
@@ -743,7 +762,12 @@ MCPORTER_SERVER_NAME=${MCPORTER_SERVER_NAME:-smartthings}
 
 INSTALL_OPENCLAW_SKILL_VALUE=${INSTALL_OPENCLAW_SKILL:-}
 if [ -z "$INSTALL_OPENCLAW_SKILL_VALUE" ]; then
-  read -rp "Install SKILL.md into OpenClaw skill folders now? [Y/n]: " INSTALL_OPENCLAW_SKILL_VALUE
+  if has_openclaw; then
+    read -rp "OpenClaw detected. Install SKILL.md into OpenClaw skill folders now? [Y/n]: " INSTALL_OPENCLAW_SKILL_VALUE
+  else
+    log "OpenClaw not detected locally; skipping SKILL.md install prompt"
+    INSTALL_OPENCLAW_SKILL_VALUE="n"
+  fi
 fi
 INSTALL_OPENCLAW_SKILL_VALUE=${INSTALL_OPENCLAW_SKILL_VALUE:-y}
 if ! is_no "$INSTALL_OPENCLAW_SKILL_VALUE"; then

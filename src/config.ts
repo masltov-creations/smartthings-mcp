@@ -34,7 +34,10 @@ const schema = z.object({
   MCP_GATEWAY_ENABLED: z.string().optional(),
   UPSTREAMS_CONFIG_PATH: z.string().default("config/upstreams.json"),
   UPSTREAMS_REFRESH_INTERVAL_SEC: z.coerce.number().int().min(0).default(300),
-  UPSTREAMS_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15000)
+  UPSTREAMS_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
+  SMARTTHINGS_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15000),
+  ROOM_TEMP_CACHE_TTL_SEC: z.coerce.number().int().min(0).default(20),
+  ROOM_TEMP_STATUS_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(8)
 });
 
 const parsed = schema.safeParse(process.env);
@@ -74,5 +77,8 @@ export const config = {
   gatewayEnabled: boolFromEnv(env.MCP_GATEWAY_ENABLED, false),
   upstreamsConfigPath: env.UPSTREAMS_CONFIG_PATH,
   upstreamsRefreshIntervalSec: env.UPSTREAMS_REFRESH_INTERVAL_SEC,
-  upstreamsRequestTimeoutMs: env.UPSTREAMS_REQUEST_TIMEOUT_MS
+  upstreamsRequestTimeoutMs: env.UPSTREAMS_REQUEST_TIMEOUT_MS,
+  smartThingsRequestTimeoutMs: env.SMARTTHINGS_REQUEST_TIMEOUT_MS,
+  roomTempCacheTtlSec: env.ROOM_TEMP_CACHE_TTL_SEC,
+  roomTempStatusConcurrency: env.ROOM_TEMP_STATUS_CONCURRENCY
 };

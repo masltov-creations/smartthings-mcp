@@ -9,6 +9,12 @@ export const listDevicesSchema = {
   installedAppId: installedAppIdSchema
 };
 
+export const roomTemperatureMapSchema = {
+  locationId: uuid.optional(),
+  installedAppId: installedAppIdSchema,
+  refresh: z.boolean().optional()
+};
+
 export const deviceIdSchema = {
   deviceId: uuid,
   installedAppId: installedAppIdSchema

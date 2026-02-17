@@ -47,8 +47,8 @@ Keep default responses at L1+L2 unless deeper detail is requested.
 - "What locations/devices do I have?" -> `list_locations`, `list_devices`
 - "What temperature is each room/device in?" -> `list_devices_with_room_temperatures`
 - "What is this device exactly?" -> `get_device_details`
-- "Is this device on/off/online?" -> `get_device_status`
-- "Turn on/off or set device X" -> `send_device_command` (confirmation required)
+- "Is this device on/off/online?" -> `get_device_status` (single) or `get_device_statuses` (many)
+- "Turn on/off or set device X" -> `send_device_command_and_verify` (preferred, confirmation required)
 - "Run scene X" -> `execute_scene` (confirmation required)
 - "Show rules/automations" -> `list_rules`
 - "Inspect rule X" -> `get_rule_details`
@@ -56,6 +56,7 @@ Keep default responses at L1+L2 unless deeper detail is requested.
 
 ## Fast Paths (Use First)
 - Temperature summary requests: `list_devices_with_room_temperatures`
+- Multi-device state checks: `get_device_statuses` with explicit `deviceIds` whenever possible.
 - Avoid per-device `get_device_status` loops unless user asks for component-level raw state.
 
 ## Read Workflow
@@ -65,11 +66,15 @@ Keep default responses at L1+L2 unless deeper detail is requested.
 4. Return raw payloads only on request.
 
 ## Write Workflow (Safety Gate)
-Before any write (`send_device_command`, `execute_scene`, `update_rule`):
+Before any write (`send_device_command_and_verify`, `execute_scene`, `update_rule`):
 1. Echo exact target and planned action.
 2. Ask for explicit confirmation.
 3. Execute only after confirmation.
 4. Report concise success/failure with target IDs and timestamp.
+
+For device commands, prefer `send_device_command_and_verify` with concrete expectations.
+Example expectation:
+- `componentId: "main", capability: "switch", attribute: "switch", equals: "on"`
 
 ## Output Contract (Always)
 1. Start with one direct sentence.

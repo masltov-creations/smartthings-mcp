@@ -2,7 +2,7 @@
 
 *And now for something completely automated.*
 
-A practical MCP server that lets MCP-capable agents talk to SmartThings safely, with OAuth2 handling, solid defaults, and one setup flow that does the heavy lifting.
+A practical MCP server for SmartThings with OAuth2, durable HTTPS tunnel support, and setup automation that does the boring bits for you.
 
 Built via human + AI collaboration (human thought, AI coded).
 
@@ -12,9 +12,7 @@ Built via human + AI collaboration (human thought, AI coded).
 git clone https://github.com/masltov-creations/smartthings-mcp && cd smartthings-mcp && ./scripts/setup.sh
 ```
 
-That setup flow is the main entry point. It is designed to be rerun safely after partial/failed attempts.
-
-After setup, authorize once:
+Then authorize once:
 
 ```text
 https://<your-domain>/oauth/start
@@ -22,29 +20,42 @@ https://<your-domain>/oauth/start
 
 ## What Setup Handles For You
 
-`./scripts/setup.sh` can do all of this:
-- prompts for Cloudflare or ngrok tunnel configuration
-- writes/updates `.env` with sane defaults
-- prompts for SmartThings OAuth client credentials
-- installs dependencies and builds
-- installs/refreshes systemd services (MCP server + tunnel)
-- optionally installs `SKILL.md` into OpenClaw locations
-- optionally configures/verifies `mcporter`
-- waits for local/public health endpoints
-- can wait for OAuth e2e pass after you authorize
+`./scripts/setup.sh` is the primary workflow and is safe to rerun.
 
-In short: setup is the intended operator workflow, not a side quest.
+It can:
+- configure Cloudflare or ngrok tunnel settings
+- write/update `.env` defaults
+- collect SmartThings OAuth client credentials
+- install dependencies and build
+- install/refresh systemd services (server + tunnel)
+- optionally install `SKILL.md` for OpenClaw
+- optionally configure and verify `mcporter`
+- wait for local/public health readiness
+- optionally wait for OAuth e2e pass after authorization
 
 ## What Setup Asks You For
 
-- tunnel provider: `cloudflare` or `ngrok`
+- tunnel provider (`cloudflare` or `ngrok`)
+- ngrok domain + authtoken (if ngrok selected)
 - SmartThings `client_id` + `client_secret`
 - optional OpenClaw skill install
 - optional `mcporter` registration/verification
 - optional gateway upstream management
 
-If using ngrok:
-- static domain: https://dashboard.ngrok.com/domains
+## Provider Access Checklist
+
+1. Install SmartThings CLI: https://developer.smartthings.com/docs/sdks/cli/
+2. Log in: `smartthings login`
+3. Create OAuth-In SmartApp: https://developer.smartthings.com/docs/connected-services/oauth-integrations/
+4. Use these exact values:
+- Target URL: `https://<your-domain>/smartthings`
+- Redirect URI: `https://<your-domain>/oauth/callback`
+- Scopes: `r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*`
+5. Paste credentials into setup when prompted.
+6. Authorize at `/oauth/start`.
+
+ngrok links:
+- domains: https://dashboard.ngrok.com/domains
 - authtoken: https://dashboard.ngrok.com/get-started/your-authtoken
 
 ## Quick Verify
@@ -54,50 +65,47 @@ curl -sS http://127.0.0.1:8080/healthz?e2e=1
 npx -y mcporter list smartthings --schema
 ```
 
-If `e2e.status` is `pass`, the server is ready.
+If `e2e.status` is `pass`, you are in business.
 
 ## Skill (For LLMs)
 
-Use `SKILL.md` as the operator guide for agents:
+Use `SKILL.md` as the operator guide:
 - tool routing
 - progressive disclosure
 - output formatting contract
 - write-safety confirmation flow
 
-If OpenClaw is detected locally, setup offers to install the skill automatically.
+Setup can install this automatically when OpenClaw is detected.
 
 ## Tool Highlights
 
-### Read and query
+### Read/query
 - `list_locations`
 - `list_devices`
-- `list_devices_with_room_temperatures` (fast path for room/device temperature questions)
+- `list_devices_with_room_temperatures`
 - `get_device_details`
 - `get_device_status`
 - `list_scenes`
 - `list_rules`
 - `get_rule_details`
 
-### Write and control
+### Write/control
 - `send_device_command` (confirm first)
 - `execute_scene` (confirm first)
 - `update_rule` (confirm first)
 
-## SmartThings OAuth App Checklist (Exact Values)
+## Fast Query Examples
 
-1. Install SmartThings CLI: https://developer.smartthings.com/docs/sdks/cli/
-2. Log in: `smartthings login`
-3. Create OAuth-In SmartApp: https://developer.smartthings.com/docs/connected-services/oauth-integrations/
-4. Use:
-- Target URL: `https://<your-domain>/smartthings`
-- Redirect URI: `https://<your-domain>/oauth/callback`
-- Scopes: `r:locations:* r:devices:* x:devices:* r:scenes:* x:scenes:* r:rules:* w:rules:*`
-5. Paste `client_id` + `client_secret` into setup when asked.
-6. Complete authorization at `/oauth/start`.
+```bash
+# Device + room temperature summary (fast path)
+npx -y mcporter call --server smartthings --tool list_devices_with_room_temperatures
 
-Optional mobile testing:
-- Enable developer mode: https://developer.smartthings.com/docs/devices/enable-developer-mode/
-- Test connected service: https://developer.smartthings.com/docs/connected-services/test-your-connected-service/
+# Device inventory
+npx -y mcporter call --server smartthings --tool list_devices
+
+# Device details
+npx -y mcporter call --server smartthings --tool get_device_details deviceId=<uuid>
+```
 
 ## OpenClaw + mcporter
 
@@ -113,19 +121,9 @@ List tools:
 npx -y mcporter list smartthings --schema
 ```
 
-Sample calls:
+## Optional Integrations
 
-```bash
-npx -y mcporter call --server smartthings --tool list_locations
-npx -y mcporter call --server smartthings --tool list_devices
-npx -y mcporter call --server smartthings --tool list_devices_with_room_temperatures
-```
-
-## Optional: Gateway Mode (Advanced)
-
-Use this only if you want one MCP endpoint with named upstreams.
-
-Enable:
+If you want one shared endpoint with named upstreams:
 
 ```bash
 MCP_GATEWAY_ENABLED=true ./scripts/setup.sh
@@ -155,7 +153,7 @@ Re-run setup safely:
 cd /home/$USER/apps/smartthings-mcp && ./scripts/setup.sh
 ```
 
-Install skill manually (workspace):
+Install workspace skill manually:
 
 ```bash
 install -Dm644 SKILL.md ~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md
@@ -164,26 +162,26 @@ install -Dm644 SKILL.md ~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md
 ## Troubleshooting (Quick Hits)
 
 - `redirect_uri could not be validated`
-  Redirect URI in SmartThings app must exactly match `https://<your-domain>/oauth/callback`.
+  Redirect URI must exactly match `https://<your-domain>/oauth/callback`.
 
 - `dial tcp 127.0.0.1:8080: connect: connection refused`
-  Service is down or restarting. Check `systemctl status smartthings-mcp`.
+  Service is down/restarting. Check `systemctl status smartthings-mcp`.
 
-- `SSE error` / `406 Not Acceptable`
-  MCP endpoint requires `Accept: text/event-stream` for manual calls.
+- `406` / SSE errors
+  MCP endpoint expects `Accept: text/event-stream` for manual calls.
 
 - `401` from SmartThings API
-  Re-run `/oauth/start` and complete authorization again.
+  Re-run `/oauth/start` and complete authorization.
 
-- Temperature queries feel slow
-  Use `list_devices_with_room_temperatures` before per-device status fan-out.
+- Temperature questions are slow
+  Use `list_devices_with_room_temperatures` before per-device status loops.
 
 ## Security Notes
 
-- No secrets should be committed.
+- Keep secrets in `.env`, never in git.
 - OAuth token refresh is automatic server-side.
 - Host/origin checks are enforced.
-- Write actions should always require explicit user confirmation in the agent layer.
+- Agent layer should require explicit confirmation before write actions.
 
 ## Architecture (High Level)
 
@@ -192,17 +190,7 @@ MCP client -> SmartThings MCP -> SmartThings APIs
                       |
                 OAuth2 + token refresh
                       |
-          optional tunnel (Cloudflare/ngrok)
-```
-
-## WSL Notes
-
-WSL2 + systemd is the recommended runtime for durable services.
-
-Windows host Git option:
-
-```bash
-winget install Git.Git
+      optional public tunnel (Cloudflare/ngrok)
 ```
 
 ## License

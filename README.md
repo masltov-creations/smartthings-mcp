@@ -85,12 +85,14 @@ Setup can install this automatically when OpenClaw is detected.
 - `list_devices_with_room_temperatures`
 - `get_device_details`
 - `get_device_status`
+- `get_device_statuses` (bulk status in one call)
 - `list_scenes`
 - `list_rules`
 - `get_rule_details`
 
 ### Write/control
 - `send_device_command` (confirm first)
+- `send_device_command_and_verify` (preferred: command + state verification)
 - `execute_scene` (confirm first)
 - `update_rule` (confirm first)
 
@@ -105,6 +107,15 @@ npx -y mcporter call --server smartthings --tool list_devices
 
 # Device details
 npx -y mcporter call --server smartthings --tool get_device_details deviceId=<uuid>
+
+# Bulk status for many devices in one MCP call
+npx -y mcporter call --server smartthings --tool get_device_statuses deviceIds='["<uuid1>","<uuid2>"]'
+
+# Command + verify in one call (preferred for automations)
+npx -y mcporter call --server smartthings --tool send_device_command_and_verify \
+  deviceId=<uuid> \
+  commands='[{"component":"main","capability":"switch","command":"on"}]' \
+  expectations='[{"componentId":"main","capability":"switch","attribute":"switch","equals":"on"}]'
 ```
 
 ## OpenClaw + mcporter
@@ -174,7 +185,7 @@ install -Dm644 SKILL.md ~/.openclaw/workspace/skills/smartthings-mcp/SKILL.md
   Re-run `/oauth/start` and complete authorization.
 
 - Temperature questions are slow
-  Use `list_devices_with_room_temperatures` before per-device status loops.
+  Use `list_devices_with_room_temperatures` and `get_device_statuses` before per-device status loops.
 
 ## Security Notes
 

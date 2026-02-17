@@ -2,10 +2,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SmartThingsClient } from "./smartthingsApi.js";
 import {
   deviceIdSchema,
+  deviceStatusesSchema,
   listDevicesSchema,
   roomTemperatureMapSchema,
   ruleSchema,
   sceneSchema,
+  sendCommandAndVerifySchema,
   sendCommandSchema,
   updateRuleSchema
 } from "./validators.js";
@@ -51,9 +53,32 @@ export async function createMcpServer(client: SmartThingsClient) {
     return toText(data);
   });
 
+  server.tool("get_device_statuses", deviceStatusesSchema, async (input, _extra) => {
+    const data = await client.getDeviceStatuses(
+      input.locationId,
+      input.deviceIds,
+      input.installedAppId,
+      input.concurrency
+    );
+    return toText(data);
+  });
+
   server.tool("send_device_command", sendCommandSchema, async (input, _extra) => {
     const data = await client.sendDeviceCommand(input.deviceId, input.commands, input.installedAppId);
     return toText(data ?? { ok: true });
+  });
+
+  server.tool("send_device_command_and_verify", sendCommandAndVerifySchema, async (input, _extra) => {
+    const data = await client.sendDeviceCommandAndVerify(
+      input.deviceId,
+      input.commands,
+      input.expectations,
+      input.attempts ?? 4,
+      input.initialDelayMs ?? 800,
+      input.backoffMultiplier ?? 1.8,
+      input.installedAppId
+    );
+    return toText(data);
   });
 
   server.tool("list_scenes", empty, async (_input, _extra) => {

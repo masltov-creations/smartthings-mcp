@@ -55,6 +55,55 @@ type RoomTemperaturePayload = {
   items: DeviceRoomTemperatureItem[];
 };
 
+type DeviceStatusBatchItem = {
+  deviceId: string;
+  ok: boolean;
+  status: any | null;
+  error: string | null;
+};
+
+type DeviceStatusesPayload = {
+  summary: {
+    generatedAt: string;
+    source: "deviceIds" | "locationDevices";
+    requested: number;
+    resolved: number;
+    failed: number;
+    durationMs: number;
+    concurrency: number;
+  };
+  items: DeviceStatusBatchItem[];
+};
+
+type CommandExpectation = {
+  componentId?: string;
+  capability: string;
+  attribute: string;
+  equals?: unknown;
+  oneOf?: unknown[];
+  exists?: boolean;
+};
+
+type CommandExpectationCheck = {
+  componentId: string;
+  capability: string;
+  attribute: string;
+  actual: unknown;
+  comparator: "equals" | "oneOf" | "exists" | "notExists";
+  expected: unknown;
+  passed: boolean;
+};
+
+type CommandVerificationResult = {
+  ok: boolean;
+  deviceId: string;
+  attemptsUsed: number;
+  durationMs: number;
+  commandResponse: any;
+  checks: CommandExpectationCheck[];
+  error: string | null;
+};
+
 export class SmartThingsClient {
   private readonly roomTempCache = new Map<string, { expiresAt: number; data: RoomTemperaturePayload }>();
 
@@ -300,6 +349,114 @@ export class SmartThingsClient {
     return Math.round(value * factor) / factor;
   }
 
+  private dedupeDeviceIds(deviceIds: string[]): string[] {
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const id of deviceIds) {
+      const normalized = id.trim();
+      if (normalized.length === 0 || seen.has(normalized)) continue;
+      seen.add(normalized);
+      deduped.push(normalized);
+    }
+    return deduped;
+  }
+
+  private deepEqual(left: unknown, right: unknown): boolean {
+    if (Object.is(left, right)) return true;
+    if (typeof left !== typeof right) return false;
+    if (left === null || right === null) return left === right;
+
+    if (Array.isArray(left) && Array.isArray(right)) {
+      if (left.length !== right.length) return false;
+      for (let i = 0; i < left.length; i += 1) {
+        if (!this.deepEqual(left[i], right[i])) return false;
+      }
+      return true;
+    }
+
+    if (typeof left === "object" && typeof right === "object") {
+      const leftObj = left as Record<string, unknown>;
+      const rightObj = right as Record<string, unknown>;
+      const leftKeys = Object.keys(leftObj);
+      const rightKeys = Object.keys(rightObj);
+      if (leftKeys.length !== rightKeys.length) return false;
+      for (const key of leftKeys) {
+        if (!Object.prototype.hasOwnProperty.call(rightObj, key)) return false;
+        if (!this.deepEqual(leftObj[key], rightObj[key])) return false;
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  private getStatusValue(status: any, expectation: CommandExpectation): unknown {
+    const componentId = expectation.componentId ?? "main";
+    return status?.components?.[componentId]?.[expectation.capability]?.[expectation.attribute]?.value;
+  }
+
+  private evaluateCommandExpectations(status: any, expectations: CommandExpectation[]): CommandExpectationCheck[] {
+    return expectations.map((expectation) => {
+      const componentId = expectation.componentId ?? "main";
+      const actual = this.getStatusValue(status, expectation);
+
+      if (expectation.oneOf !== undefined) {
+        const passed = expectation.oneOf.some((candidate) => this.deepEqual(actual, candidate));
+        return {
+          componentId,
+          capability: expectation.capability,
+          attribute: expectation.attribute,
+          actual,
+          comparator: "oneOf",
+          expected: expectation.oneOf,
+          passed
+        };
+      }
+
+      if (Object.prototype.hasOwnProperty.call(expectation, "equals")) {
+        const passed = this.deepEqual(actual, expectation.equals);
+        return {
+          componentId,
+          capability: expectation.capability,
+          attribute: expectation.attribute,
+          actual,
+          comparator: "equals",
+          expected: expectation.equals,
+          passed
+        };
+      }
+
+      if (expectation.exists === false) {
+        const passed = actual === undefined || actual === null;
+        return {
+          componentId,
+          capability: expectation.capability,
+          attribute: expectation.attribute,
+          actual,
+          comparator: "notExists",
+          expected: null,
+          passed
+        };
+      }
+
+      const passed = actual !== undefined && actual !== null;
+      return {
+        componentId,
+        capability: expectation.capability,
+        attribute: expectation.attribute,
+        actual,
+        comparator: "exists",
+        expected: true,
+        passed
+      };
+    });
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    if (ms <= 0) return;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   private async mapWithConcurrency<T, R>(
     items: T[],
     concurrency: number,
@@ -478,11 +635,120 @@ export class SmartThingsClient {
     ]);
   }
 
+  async getDeviceStatuses(
+    locationId?: string,
+    deviceIds?: string[],
+    installedAppId?: string,
+    concurrency = config.roomTempStatusConcurrency
+  ): Promise<DeviceStatusesPayload> {
+    const startedAt = Date.now();
+    let source: "deviceIds" | "locationDevices" = "deviceIds";
+    let targetDeviceIds = this.dedupeDeviceIds(deviceIds ?? []);
+
+    if (targetDeviceIds.length === 0) {
+      source = "locationDevices";
+      const deviceResponse = await this.listDevices(locationId, installedAppId);
+      const devices: any[] = Array.isArray(deviceResponse?.items) ? deviceResponse.items : [];
+      targetDeviceIds = this.dedupeDeviceIds(
+        devices
+          .map((device) => String(device?.deviceId ?? ""))
+          .filter((id) => id.length > 0)
+      );
+    }
+
+    const safeConcurrency = Math.max(1, Math.min(concurrency, 20, targetDeviceIds.length || 1));
+    const items = await this.mapWithConcurrency(targetDeviceIds, safeConcurrency, async (deviceId) => {
+      try {
+        const status = await this.getDeviceStatus(deviceId, installedAppId);
+        return {
+          deviceId,
+          ok: true,
+          status,
+          error: null
+        };
+      } catch (err) {
+        logger.warn({ err, deviceId }, "Failed to fetch SmartThings device status in batch request");
+        return {
+          deviceId,
+          ok: false,
+          status: null,
+          error: (err as Error)?.message ?? "Unknown error"
+        };
+      }
+    });
+
+    const resolved = items.filter((item) => item.ok).length;
+    return {
+      summary: {
+        generatedAt: new Date().toISOString(),
+        source,
+        requested: targetDeviceIds.length,
+        resolved,
+        failed: targetDeviceIds.length - resolved,
+        durationMs: Date.now() - startedAt,
+        concurrency: safeConcurrency
+      },
+      items
+    };
+  }
+
   async sendDeviceCommand(deviceId: string, commands: any[], installedAppId?: string) {
     return this.request("POST", `/devices/${deviceId}/commands`, { commands }, installedAppId, [
       `x:devices:${deviceId}`,
       "x:devices:*"
     ]);
+  }
+
+  async sendDeviceCommandAndVerify(
+    deviceId: string,
+    commands: any[],
+    expectations: CommandExpectation[],
+    attempts: number,
+    initialDelayMs: number,
+    backoffMultiplier: number,
+    installedAppId?: string
+  ): Promise<CommandVerificationResult> {
+    const startedAt = Date.now();
+    const commandResponse = await this.sendDeviceCommand(deviceId, commands, installedAppId);
+    let nextDelayMs = Math.max(0, Math.floor(initialDelayMs));
+    let lastChecks: CommandExpectationCheck[] = [];
+    let lastError: string | null = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      await this.sleep(nextDelayMs);
+      nextDelayMs = Math.floor(nextDelayMs * backoffMultiplier);
+
+      try {
+        const status = await this.getDeviceStatus(deviceId, installedAppId);
+        const checks = this.evaluateCommandExpectations(status, expectations);
+        lastChecks = checks;
+
+        if (checks.every((check) => check.passed)) {
+          return {
+            ok: true,
+            deviceId,
+            attemptsUsed: attempt,
+            durationMs: Date.now() - startedAt,
+            commandResponse,
+            checks,
+            error: null
+          };
+        }
+      } catch (err) {
+        lastError = (err as Error)?.message ?? "Unknown verification error";
+        logger.warn({ err, deviceId, attempt }, "Failed to verify device state after command");
+      }
+    }
+
+    return {
+      ok: false,
+      deviceId,
+      attemptsUsed: attempts,
+      durationMs: Date.now() - startedAt,
+      commandResponse,
+      checks: lastChecks,
+      error: lastError ?? "Expectation mismatch after all verification attempts"
+    };
   }
 
   async listScenes(installedAppId?: string) {
